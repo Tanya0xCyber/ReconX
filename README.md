@@ -26,7 +26,7 @@
 
 ```bash
 git clone https://github.com/Tanya0xCyber/ReconX.git
-cd reconx
+cd ReconX
 pip3 install -r requirements.txt
 ```
 
