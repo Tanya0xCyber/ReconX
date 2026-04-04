@@ -25,7 +25,7 @@
 ##  Installation
 
 ```bash
-git clone https://github.com/YOURUSERNAME/reconx.git
+git clone https://github.com/Tanya0xCyber/reconx.git
 cd reconx
 pip3 install -r requirements.txt
 ```
