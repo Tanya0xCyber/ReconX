@@ -187,7 +187,7 @@ def run_port_scan(host, ports, config):
     """
 
     threads = config.get("threads", 25)
-    timeout = min(config.get("timeout", 3), 3)  # cap at 3s for port scan
+    timeout = min(config.get("timeout", 3), 1.5)  # cap at 1.5s for port scan
     open_ports = []
 
     with ThreadPoolExecutor(max_workers=threads) as executor:
