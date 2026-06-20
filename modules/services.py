@@ -479,12 +479,12 @@ def probe_http_service(host, port, config):
 
             # ── detect admin panels ────────────────────────────────────────
             # In modules/services.py
-# Find the admin detection section and replace with this:
+            # Find the admin detection section and replace with this:
 
-# ── detect admin panels — STRICT matching only ──────
-# broad keyword matching causes false positives on any
-# page that mentions the word "admin" in navigation etc.
-# we require STRONG signals, not just keywords in body
+            # ── detect admin panels — STRICT matching only ──────
+            # broad keyword matching causes false positives on any
+            # page that mentions the word "admin" in navigation etc.
+            # we require STRONG signals, not just keywords in body
 
             ADMIN_STRONG_SIGNALS = [
   		    # URL path signals — most reliable
