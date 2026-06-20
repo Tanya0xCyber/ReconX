@@ -902,13 +902,13 @@ def print_analysis_results(results):
               f"Detected via automated scan — {hid}"
            )
 
-          console.print(
+           console.print(
               f"  {sev_str}  [white]{title}[/]"
-          )
-          console.print(
+           )
+           console.print(
               f"  [dim]           Evidence: {evidence}[/]"
-          )
-          console.print()
+           )
+           console.print()
     # ── Correlations — scenario format ─────────────────
     has_no_csp   = any("CSP"   in h.get("title","") for h in hints)
     has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
