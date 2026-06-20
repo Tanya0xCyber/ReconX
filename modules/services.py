@@ -537,7 +537,9 @@ def probe_http_service(host, port, config):
 
 			is_login = any(sig in url_path for sig in LOGIN_URL_SIGNALS)
 			if not is_login and title:
-		    		is_login = any(sig in title.lower() for sig in LOGIN_TITLE_SIGNALS)
+		    		is_login = any(
+						sig in title.lower() 
+						for sig in LOGIN_TITLE_SIGNALS)
 
             # ── flag interesting ports ─────────────────────────────────────
             # ports that shouldn't normally be internet-facing
