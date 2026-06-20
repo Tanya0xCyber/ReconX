@@ -8,7 +8,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██╔╝ ██╗
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝
 
-         automated recon pipeline · python · kali
+   automated recon pipeline · python · kali
              Tanya Singh · 2026
 ```
 
@@ -53,7 +53,7 @@ python3 reconx.py -t target.com --shodan API_KEY  # + CVE data
 | 1 · Passive | WHOIS · DNS · crt.sh · Geo/ASN · Shodan |
 | 2 · Active | subdomain BF · JS secrets · email harvest |
 | 3 · Services | port scan · banner grab · HTTP probe |
-| 4 · Analysis | WAF · tech stack · vuln hints · chains |
+| 4 · Analysis | WAF · tech stack · vuln hints · attack chains |
 
 ---
 
