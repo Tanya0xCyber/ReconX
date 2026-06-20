@@ -1333,23 +1333,23 @@ def main():
 
     try:
     # stage 1: passive — run silently, print after
-    run_stage("Passive Recon", run_passive_recon,
+        run_stage("Passive Recon", run_passive_recon,
               (config["target"],), config, results)
 
     # stage 2: active
-    run_stage("Active Recon", run_active_recon,
+        run_stage("Active Recon", run_active_recon,
               (config["target"], config["wordlist"]),
               config, results)
 
     # stage 3: services
-    targets_to_scan = (
-        results.get("subdomains", [])[:5] + [config["target"]]
-    )
-    run_stage("Service Discovery", run_service_discovery,
+        targets_to_scan = (
+            results.get("subdomains", [])[:5] + [config["target"]]
+        )
+        run_stage("Service Discovery", run_service_discovery,
               (targets_to_scan,), config, results)
 
     # stage 4: analysis
-    run_stage("Analysis Engine", run_analysis,
+        run_stage("Analysis Engine", run_analysis,
               (results,), config, results)
 
     except KeyboardInterrupt:
