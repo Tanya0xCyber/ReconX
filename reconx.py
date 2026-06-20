@@ -850,13 +850,13 @@ def print_analysis_results(results):
 
     # ── Risk findings — compact format ─────────────────
     if hints:
-         console.print(
+        console.print(
         f"  [bold bright_green]Findings[/]  "
         f"[dim]{len(hints)} total[/]"
         )
         console.print()
 
-       for h in hints:
+        for h in hints:
            sev    = h.get("severity", "Info")
            title  = h.get("title", "")
            hid    = h.get("id", "")
