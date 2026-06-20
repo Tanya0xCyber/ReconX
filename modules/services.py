@@ -478,16 +478,66 @@ def probe_http_service(host, port, config):
             result["is_login"] = any(k in body_lower for k in login_keywords)
 
             # ── detect admin panels ────────────────────────────────────────
-            admin_keywords = [
-                "admin", "administrator", "dashboard", "control panel",
-                "management", "backend", "cms", "phpmyadmin",
-                "grafana", "kibana", "jenkins", "gitlab",
-            ]
-            title_lower = (result["title"] or "").lower()
-            result["is_admin"] = any(
-                k in body_lower[:2000] or k in title_lower
-                for k in admin_keywords
-            )
+            # In modules/services.py
+# Find the admin detection section and replace with this:
+
+# ── detect admin panels — STRICT matching only ──────
+# broad keyword matching causes false positives on any
+# page that mentions the word "admin" in navigation etc.
+# we require STRONG signals, not just keywords in body
+
+            ADMIN_STRONG_SIGNALS = [
+  		    # URL path signals — most reliable
+              "/wp-admin",
+               "/admin/login",
+   				 "/administrator",
+   				 "/admin/dashboard",
+   				 "/panel",
+   				 "/cpanel",
+ 			     "/adminpanel",
+   				 "/manage/login",
+			    "/staff/login",
+			    "/backend/login",
+			    "/cms/login",
+			    "/phpmyadmin",
+			]
+
+			ADMIN_TITLE_SIGNALS = [
+  		    # page title must contain these — title is specific
+    			"admin login",
+   				 "administrator login",
+   				 "admin panel",
+   				 "control panel",
+   				 "management login",
+   				 "staff login",
+   				 "backend login",
+   				 "admin dashboard",
+   				 "site administration",
+			]
+
+			# check URL path first — most reliable signal
+			url_path = urlparse(url).path.lower()
+			is_admin = any(sig in url_path for sig in ADMIN_STRONG_SIGNALS)
+	
+			# if URL doesn't match, check title — but ONLY title
+			# never check body for admin — too many false positives
+			if not is_admin and title:
+ 			   title_lower = title.lower()
+   			   is_admin = any(sig in title_lower for sig in ADMIN_TITLE_SIGNALS)
+
+			# ── detect login pages — also strict ────────────────
+			# require BOTH a login-specific URL or title
+			# not just "password" appearing anywhere on the page
+
+			LOGIN_URL_SIGNALS  = ["/login", "/signin", "/sign-in",
+                    			  "/auth", "/account/login", "/user/login",
+                    			  "/wp-login.php", "/session/new"]
+			LOGIN_TITLE_SIGNALS = ["sign in", "log in", "login",
+                      			 "sign into", "account login"]
+
+			is_login = any(sig in url_path for sig in LOGIN_URL_SIGNALS)
+			if not is_login and title:
+		    		is_login = any(sig in title.lower() for sig in LOGIN_TITLE_SIGNALS)
 
             # ── flag interesting ports ─────────────────────────────────────
             # ports that shouldn't normally be internet-facing
