@@ -849,29 +849,31 @@ def print_analysis_results(results):
     console.print()
 
     # ── Risk findings — compact format ─────────────────
-   if hints:
-      console.print(
+if hints:
+    console.print(
         f"  [bold bright_green]Findings[/]  "
         f"[dim]{len(hints)} total[/]"
-      )
-      console.print()
+    )
+    console.print()
 
-      for h in hints:
-          sev   = h.get("severity", "Info")
-          title = h.get("title", "")
-          hid   = h.get("id", "")
+    for h in hints:
+        sev    = h.get("severity", "Info")
+        title  = h.get("title", "")
+        hid    = h.get("id", "")
 
-        # Severity label
-          if sev == "Critical":
-             sev_str = "[red][Critical][/]"
-          elif sev == "High":
-             sev_str = "[yellow][High][/]"
-          elif sev == "Medium":
-              sev_str = "[bright_blue][Medium][/]"
-          else:
-              sev_str = "[dim][Low][/]"
+        # severity indicator — no emoji, just color + symbol
+        if sev == "Critical":
+            sev_str = "[red][Critical][/]"
+        elif sev == "High":
+            sev_str = "[yellow][High]   [/]"
+        elif sev == "Medium":
+            sev_str = "[bright_blue][Medium] [/]"
+        else:
+            sev_str = "[dim][Low]    [/]"
 
-          evidence_map = {
+        # generate evidence based on finding ID
+        # this is what actually proves the finding is real
+        evidence_map = {
             "HDR-001": "Strict-Transport-Security header absent in response",
             "HDR-002": "Content-Security-Policy header absent in response",
             "HDR-003": "X-Frame-Options header absent in response",
@@ -881,16 +883,16 @@ def print_analysis_results(results):
             "DNS-003": "_dmarc TXT lookup returned no record",
             "JS-001":  "AWS key pattern matched in JS bundle",
             "JS-002":  "Secret/token pattern matched in client-side JS",
-            "PORT-001": "Port 2375 open — Docker API responded",
-            "PORT-002": "Port 6379 open — Redis responded without auth prompt",
-            "PORT-003": "Port 27017 open — MongoDB responded without auth",
-            "PORT-004": "Port 9200 open — Elasticsearch responded without auth",
-            "PORT-005": "Port 6443 open — Kubernetes API responded",
-            "PORT-006": "Port 23 open — Telnet service responded",
-            "PORT-007": "Port 3389 open — RDP service responded",
+            "PORT-001":"Port 2375 open — Docker API responded",
+            "PORT-002":"Port 6379 open — Redis responded without auth prompt",
+            "PORT-003":"Port 27017 open — MongoDB responded without auth",
+            "PORT-004":"Port 9200 open — Elasticsearch responded without auth",
+            "PORT-005":"Port 6443 open — Kubernetes API responded",
+            "PORT-006":"Port 23 open — Telnet service responded",
+            "PORT-007":"Port 3389 open — RDP service responded",
             "ADM-001": "Admin panel keywords found in HTTP response body",
-            "TECH-001": "WordPress detected via /wp-content/ path in HTML",
-            "TECH-002": "ASP.NET detected via __VIEWSTATE field in HTML",
+            "TECH-001":"WordPress detected via /wp-content/ path in HTML",
+            "TECH-002":"ASP.NET detected via __VIEWSTATE field in HTML",
             "CVE-001": "CVE identifiers returned by Shodan for this IP",
             "SUB-001": "Subdomain CNAME points to unclaimed external service",
         }
@@ -903,14 +905,10 @@ def print_analysis_results(results):
         console.print(
             f"  {sev_str}  [white]{title}[/]"
         )
-
         console.print(
-            f"        [dim]Evidence:[/] "
-            f"[white]{evidence}[/]"
+            f"  [dim]           Evidence: {evidence}[/]"
         )
-
         console.print()
-
     # ── Correlations — scenario format ─────────────────
     has_no_csp   = any("CSP"   in h.get("title","") for h in hints)
     has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
