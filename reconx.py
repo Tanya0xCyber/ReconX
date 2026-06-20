@@ -1331,9 +1331,7 @@ def main():
     )
     console.print()
 
-
-
-try:
+    try:
     # stage 1: passive — run silently, print after
     run_stage("Passive Recon", run_passive_recon,
               (config["target"],), config, results)
@@ -1354,21 +1352,23 @@ try:
     run_stage("Analysis Engine", run_analysis,
               (results,), config, results)
 
-except KeyboardInterrupt:
-    console.print(
+    except KeyboardInterrupt:
+        console.print(
         "\n  [yellow]!  interrupted — saving partial report...[/]\n"
-    )
+        )
 
 # NOW print everything in the RIGHT order:
 # Executive summary first, raw data at bottom
-if not config["quiet"]:
-    print_executive_summary(results, config,
+    if not config["quiet"]:
+        print_executive_summary(results, config,
                             time.time() - total_start)
-    print_passive_results(results)
-    print_active_results(results)
-    print_services_results(results)
+        print_passive_results(results)
+        print_active_results(results)
+        print_services_results(results)
 
     
+
+
     # ── save report ────────────────────────────────────
     section("05 · Saving Report")
 
