@@ -849,31 +849,31 @@ def print_analysis_results(results):
     console.print()
 
     # ── Risk findings — compact format ─────────────────
-if hints:
-    console.print(
+    if hints:
+         console.print(
         f"  [bold bright_green]Findings[/]  "
         f"[dim]{len(hints)} total[/]"
-    )
-    console.print()
+        )
+        console.print()
 
-    for h in hints:
-        sev    = h.get("severity", "Info")
-        title  = h.get("title", "")
-        hid    = h.get("id", "")
+       for h in hints:
+           sev    = h.get("severity", "Info")
+           title  = h.get("title", "")
+           hid    = h.get("id", "")
 
         # severity indicator — no emoji, just color + symbol
-        if sev == "Critical":
-            sev_str = "[red][Critical][/]"
-        elif sev == "High":
-            sev_str = "[yellow][High]   [/]"
-        elif sev == "Medium":
-            sev_str = "[bright_blue][Medium] [/]"
-        else:
-            sev_str = "[dim][Low]    [/]"
+           if sev == "Critical":
+               sev_str = "[red][Critical][/]"
+           elif sev == "High":
+               sev_str = "[yellow][High]   [/]"
+           elif sev == "Medium":
+                sev_str = "[bright_blue][Medium] [/]"
+           else:
+                sev_str = "[dim][Low]    [/]"
 
         # generate evidence based on finding ID
         # this is what actually proves the finding is real
-        evidence_map = {
+           evidence_map = {
             "HDR-001": "Strict-Transport-Security header absent in response",
             "HDR-002": "Content-Security-Policy header absent in response",
             "HDR-003": "X-Frame-Options header absent in response",
@@ -895,20 +895,20 @@ if hints:
             "TECH-002":"ASP.NET detected via __VIEWSTATE field in HTML",
             "CVE-001": "CVE identifiers returned by Shodan for this IP",
             "SUB-001": "Subdomain CNAME points to unclaimed external service",
-        }
+           }
 
-        evidence = evidence_map.get(
-            hid,
-            f"Detected via automated scan — {hid}"
-        )
+           evidence = evidence_map.get(
+              hid,
+              f"Detected via automated scan — {hid}"
+           )
 
-        console.print(
-            f"  {sev_str}  [white]{title}[/]"
-        )
-        console.print(
-            f"  [dim]           Evidence: {evidence}[/]"
-        )
-        console.print()
+          console.print(
+              f"  {sev_str}  [white]{title}[/]"
+          )
+          console.print(
+              f"  [dim]           Evidence: {evidence}[/]"
+          )
+          console.print()
     # ── Correlations — scenario format ─────────────────
     has_no_csp   = any("CSP"   in h.get("title","") for h in hints)
     has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
