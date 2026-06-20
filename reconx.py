@@ -533,61 +533,94 @@ def print_active_results(results):
             console.print()
 
     # JS secrets — compact, with use case
+    # REPLACE the JS secrets block with this:
+
     if secrets:
+    # categorize properly — internal IPs are NOT secrets
+        real_secrets = [
+            s for s in secrets
+            if "Internal IP" not in s.get("type","")
+            and "Generic" not in s.get("type","")
+        ]
+        internal_ips = [
+            s for s in secrets
+            if "Internal IP" in s.get("type","")
+        ]
+        generic = [
+            s for s in secrets
+            if "Generic" in s.get("type","")
+            or ("API Key" in s.get("type","")
+                and not any(
+                    x in s.get("type","")
+                    for x in ["AWS","GitHub","Stripe","Firebase"]
+                ))
+        ]
+
+        console.print("  [bold bright_green]JS Analysis[/]")
+        console.print()
         console.print(
-            f"  [bold red]JS Secrets  {len(secrets)} found[/]"
+            f"  [dim]  Credentials / Keys  [/]  "
+            f"[{'red' if real_secrets else 'dim'}]"
+            f"{len(real_secrets)}"
+            f"[/]"
+        )
+        console.print(
+            f"  [dim]  Generic references  [/]  "
+            f"[{'yellow' if generic else 'dim'}]{len(generic)}[/]"
+        )
+        console.print(
+            f"  [dim]  Internal IPs        [/]  "
+            f"[bright_blue]{len(internal_ips)}[/]"
+            + (f"  [dim](infrastructure hints, not secrets)[/]"
+               if internal_ips else "")
         )
         console.print()
 
+    # show real secrets with use case
         secret_use = {
-            "AWS":        "→ aws cli s3 ls / iam enumerate",
-            "GitHub":     "→ clone private repos",
-            "Stripe":     "→ charge cards / read customer PII",
-            "Firebase":   "→ read/write DB if rules permissive",
-            "JWT":        "→ decode → alg confusion → forge token",
-            "Slack":      "→ read messages / post as bot",
-            "Mailgun":    "→ send mail as domain / read logs",
-            "Generic":    "→ test against discovered API endpoints",
-            "Bearer":     "→ replay against API endpoints",
-            "MongoDB":    "→ direct DB connection string",
-        }
+            "AWS":      "-> aws cli s3 ls / iam enumerate",
+             "GitHub":   "-> clone private repos",
+            "Stripe":   "-> charge cards / read customer PII",
+                "Firebase": "-> read/write DB if rules permissive",
+            "JWT":      "-> decode -> alg confusion -> forge",
+            "Slack":    "-> read messages / post as bot",
+        }    
 
-        for s in secrets[:8]:
+        for s in real_secrets[:6]:
             stype  = s.get("type","")
             val    = s.get("value","")
             masked = val[:6]+"••" if len(val)>6 else val
             file   = s.get("file","")[-35:] if s.get("file") else ""
-
-            is_crit = any(
-                x in stype
-                for x in ["AWS","Private","Stripe Live","Firebase","GitHub"]
+            use    = next(
+                (u for k,u in secret_use.items()
+                 if k.lower() in stype.lower()),
+                "-> test against discovered endpoints"
             )
-            color = "red" if is_crit else "yellow"
-
-            # find matching use case
-            use = ""
-            for k, u in secret_use.items():
-                if k.lower() in stype.lower():
-                    use = u
-                    break
-            if not use:
-                use = secret_use["Generic"]
-
             console.print(
-                f"  [{color}]▸[/]  [white]{stype}[/]  "
-                f"[{color}]{masked}[/]  "
+                f"  [red]>[/]  [white]{stype}[/]  "
+                f"[red]{masked}[/]  "
                 f"[dim]{use}[/]"
             )
             if file:
                 console.print(f"  [dim]     {file}[/]")
-
-        if len(secrets) > 8:
-            console.print(f"  [dim]  + {len(secrets)-8} more in report[/]")
         console.print()
+
+    # internal IPs separately — different category
+        if internal_ips:
+            console.print(
+                "  [bright_blue]Internal infrastructure references:[/]"
+            )
+            for s in internal_ips[:4]:
+                console.print(
+                    f"  [bright_blue]>[/]  "
+                     f"[white]{s.get('value','')[:40]}[/]  "
+                    f"[dim]-> map internal network / pivot targets[/]"
+                )
+            console.print()
     else:
-        console.print("  [dim]JS Secrets — none[/]")
+        console.print("  [dim]JS Analysis — no findings[/]")
         console.print()
-
+        
     # API endpoints — categorized, no noise
     if endpoints:
         crit_eps  = [e for e in endpoints
@@ -819,35 +852,77 @@ def print_analysis_results(results):
         )
 
     # ── Tech — mapped to attack direction ──────────────
-    tech_map = {
-        "WordPress":        "xmlrpc.php + plugin CVEs + /wp-admin BF",
-        "Laravel":          ".env / APP_DEBUG=true / mass assignment",
-        "Django":           "DEBUG=True / /admin BF / CSRF on APIs",
-        "ASP.NET":          "ViewState deser / IIS shortname / WebDAV",
-        "Next.js":          "/_next/data/ unauthed / API route missing auth",
-        "React":            "API calls in bundle / JWT in localStorage",
-        "Angular":          "env vars in bundle / source maps",
-        "Nginx":            "alias path traversal / open redirect via proxy",
-        "Apache":           "dir listing / .htaccess bypass",
-        "IIS":              "shortname vuln / WebDAV / ASP handlers",
-        "Cloudflare Pages": "static hosting → find origin / focus: app logic",
-        "Shopify":          "app layer only → IDOR / checkout / discount abuse",
-        "WordPress":        "xmlrpc + plugin CVEs + /wp-admin",
-        "Drupal":           "Drupalgeddon — check version / module CVEs",
-    }
+   
 
     if tech:
         console.print()
-        console.print("  [bold bright_green]Stack[/]")
+        console.print("  [bold bright_green]Tech Stack[/]")
         console.print()
-        for t in tech[:6]:
-            vec = tech_map.get(t, "check CVEs / default configs")
-            console.print(
-                f"  [bright_green]▸[/]  [white]{t}[/]  "
-                f"[dim]→ {vec}[/]"
-            )
-    console.print()
 
+    # group by category so output makes sense
+        categories = {
+            "Web Server":  ["Nginx","Apache","IIS","Litespeed","Tomcat"],
+            "Framework":   ["Laravel","Django","Ruby on Rails","ASP.NET",
+                        "Spring Boot","Symfony","Flask","PHP"],
+            "Frontend":    ["React","Vue.js","Angular","Next.js","jQuery",
+                        "Bootstrap"],
+            "CMS":         ["WordPress","Drupal","Joomla","Magento",
+                        "Shopify","Wix","Squarespace","WooCommerce"],
+            "CDN / Host":  ["Cloudflare","AWS CloudFront","Fastly",
+                        "Vercel","Netlify","GitHub Pages",
+                        "Cloudflare Pages"],
+            "Analytics":   ["Google Analytics","Hotjar"],
+        }
+
+        grouped = {}
+        uncategorized = []
+        for t in tech:
+            placed = False
+            for cat, members in categories.items():
+                if t in members:
+                    grouped.setdefault(cat, []).append(t)
+                    placed = True
+                    break
+        if not placed:
+            uncategorized.append(t)
+
+        tech_map = {
+            "WordPress":      "xmlrpc.php + plugin CVEs + /wp-admin BF",
+            "Laravel":        ".env exposure / APP_DEBUG=true",
+            "Django":         "DEBUG=True / /admin BF / CSRF on APIs",
+            "ASP.NET":        "ViewState deser / IIS shortname",
+            "Next.js":        "/_next/data/ unauthed / API route auth",
+            "React":          "secrets in bundle / JWT in localStorage",
+             "Angular":        "env vars in bundle / source maps",
+            "Nginx":          "alias path traversal / open redirect",
+            "Apache":         "dir listing / .htaccess bypass",
+            "IIS":            "shortname vuln / WebDAV",
+            "PHP":            "LFI / RFI / type juggling",
+            "Cloudflare":     "find origin IP to bypass CDN",
+            "AWS CloudFront": "find origin IP / S3 bucket check",
+             "Drupal":         "Drupalgeddon — check version",
+             "Magento":        "admin panel + Magmi / SQLi history",
+            "Spring Boot":    "/actuator endpoints — info disclosure",
+            "Tomcat":         "manager app default creds / PUT method",
+        }
+
+        for cat, members in grouped.items():
+           for t in members:
+                vec = tech_map.get(t, "check CVEs")
+                console.print(
+                     f"  [bright_green]>[/]  "
+                    f"[dim]{cat:<12}[/]  "
+                    f"[white]{t}[/]  "
+                    f"[dim]-> {vec}[/]"
+                )
+
+        for t in uncategorized:
+            console.print(
+                f"  [bright_green]>[/]  "
+                f"[dim]{'Other':<12}[/]  "
+                f"[white]{t}[/]"
+            )
+        console.print()
     # ── Risk findings — compact format ─────────────────
     if hints:
         console.print(
@@ -976,29 +1051,86 @@ def print_analysis_results(results):
     console.print("  [bold bright_green]Attacker POV[/]")
     console.print()
 
-    pov = []
-    if takeovers:
-        pov.append(
-            f"Claim `{takeovers[0].get('subdomain','')}` first — free, instant, no skill needed"
-        )
-    if secrets:
-        pov.append(
-            f"Test {len(secrets)} leaked secret(s) — fastest path to auth access"
-        )
-    if sens_ports:
-        pov.append(
-            f"Hit port(s) {', '.join(str(p.get('port','')) for p in sens_ports[:2])} — likely no auth"
-        )
-    if not pov:
-        pov.append(
-            "No critical shortcuts — pivot to manual: auth flows, IDOR, API logic"
-        )
-        if waf:
-            pov.append(f"{' + '.join(waf)} blocks injection — focus IDOR and origin bypass")
+# build realistic, grounded steps — not a movie script
+# based on ONLY what was actually found
+    atk_steps = []
 
-    for line in pov[:3]:
-        console.print(f"  [dim]→  {line}[/]")
+    if takeovers:
+        atk_steps.append((
+            "1",
+            f"Register abandoned {takeovers[0].get('service','')} "
+            f"resource to claim `{takeovers[0].get('subdomain','')}`"
+        ))
+
+    real_secrets = [
+         s for s in results.get("js_secrets",[])
+        if "Internal IP" not in s.get("type","")
+    ]
+    if real_secrets:
+        s = real_secrets[0]
+        atk_steps.append((
+            "2" if atk_steps else "1",
+             f"Validate {s.get('type','')} from JS — "
+            f"test against its service before assuming valid"
+        ))
+
+    sens = [
+        p for p in results.get("open_ports",[])
+        if p.get("port") in {2375,6379,27017,9200,6443,2379}
+    ]
+    if sens:
+        p   = sens[0]
+        lbl, _, opp = port_intel(p.get("port",""))
+        atk_steps.append((
+            str(len(atk_steps)+1),
+            f"Connect to {p.get('host','')}:{p.get('port','')} "
+            f"— test for unauthenticated access ({lbl})"
+        ))
+
+    admin_svcs = [s for s in results.get("http_services",[])
+              if s.get("is_admin")]
+    if admin_svcs:
+        atk_steps.append((
+            str(len(atk_steps)+1),
+            f"Test {admin_svcs[0].get('url','')} "
+            f"with default credentials for detected tech stack"
+        ))
+
+    eps = results.get("js_endpoints",[])
+    if eps and not atk_steps:
+        atk_steps.append((
+            "1",
+            f"Probe {len(eps)} API endpoints for "
+            f"authentication bypass and IDOR"
+        ))
+
+    has_no_dmarc = any(
+        "DMARC" in h.get("title","") for h in hints
+    )
+    emails = results.get("emails",[])
+    if has_no_dmarc and emails and len(atk_steps) < 4:
+        atk_steps.append((
+            str(len(atk_steps)+1),
+            f"Test email spoofing via domain "
+            f"({len(emails)} contacts available)"
+        ))
+
+    if not atk_steps:
+        atk_steps = [
+            ("1", "Manual auth testing on all login surfaces"),
+            ("2", "Enumerate API endpoints for IDOR"),
+            ("3", "Check robots.txt, sitemap, and JS source on subdomains"),
+        ]
+
+    console.print(
+        "  [dim]  Most likely test sequence based on findings:[/]"
+    )
     console.print()
+    for num, step in atk_steps[:4]:
+        console.print(
+            f"  [dim]{num}.[/]  [white]{step}[/]"
+        )
+    console.print()   
 
 
 def print_final_summary(results, config, elapsed_total):
