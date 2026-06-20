@@ -1492,11 +1492,10 @@ def main():
 # NOW print everything in the RIGHT order:
 # Executive summary first, raw data at bottom
     if not config["quiet"]:
-        print_intelligence_report(results, config,
-                            time.time() - total_start)
         print_passive_results(results)
         print_active_results(results)
         print_services_results(results)
+        print_analysis_results(results)
 
     
 
