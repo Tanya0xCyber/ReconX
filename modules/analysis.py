@@ -691,77 +691,344 @@ def run_waf_detection(base_url, config):
 # ══════════════════════════════════════════════════════
 #  SECTION 2 — TECH FINGERPRINTING
 # ══════════════════════════════════════════════════════
-
 def run_tech_fingerprint(base_url, config):
     """
-    Fetches the target and detects technology stack from:
-    - Response headers
-    - HTML body content
-    - Cookie names
-    - Meta tags
-    - Script/link tag patterns
-
-    Returns list of detected technologies.
+    strict tech fingerprinting.
+    requires MULTIPLE signals before confirming a technology.
+    single weak signal = not enough.
+    this prevents false positives like detecting Drupal + Magento
+    on the same site.
     """
 
-    detected = []
+    detected    = []
+    confidence  = {}   # tech → confidence score
 
     try:
         r = requests.get(
             base_url,
             timeout=config.get("timeout", 8),
             verify=False,
-            headers={"User-Agent": "Mozilla/5.0 Chrome/122.0.0.0 Safari/537.36"},
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (X11; Linux x86_64) "
+                    "AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"
+                )
+            },
             allow_redirects=True,
         )
 
-        body_lower    = r.text[:5000].lower()
+        body_lower    = r.text[:8000].lower()
         headers_lower = {
             k.lower(): v.lower()
             for k, v in r.headers.items()
         }
-        # cookie names
-        cookie_str = " ".join(r.cookies.keys()).lower()
+        cookie_str    = " ".join(r.cookies.keys()).lower()
+        server_header = headers_lower.get("server", "")
+        powered_by    = headers_lower.get("x-powered-by", "")
 
-        # meta generator tag — many CMS put their name here
-        # e.g. <meta name="generator" content="WordPress 6.4">
+        # meta generator — strongest single signal
         meta_gen = ""
+        import re
         meta_match = re.search(
-            r'<meta[^>]+name=["\']generator["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+name=["\']generator["\'][^>]+'
+            r'content=["\']([^"\']+)["\']',
             r.text, re.I
         )
         if meta_match:
             meta_gen = meta_match.group(1).lower()
 
-        for tech_name, sigs in TECH_SIGNATURES.items():
+        # ── scoring system ─────────────────────────────
+        # each tech needs minimum score to be confirmed.
+        # this prevents single weak signals causing false positives.
+        #
+        # score values:
+        #   4 = definitive (meta generator, unique cookie, unique header)
+        #   3 = strong     (unique body pattern, unique URL path)
+        #   2 = moderate   (server header value, common cookie)
+        #   1 = weak       (generic keyword in body)
+        #
+        # minimum to confirm: 3 points
+        # (prevents single generic keyword triggering detection)
 
-            hit = False
+        SIGNATURES = {
+            "WordPress": {
+                "checks": [
+                    (4, "wordpress"  in meta_gen),
+                    (3, "/wp-content/" in body_lower),
+                    (3, "/wp-includes/" in body_lower),
+                    (2, "wp-json"    in body_lower),
+                    (2, any(
+                        c.startswith("wordpress_")
+                        for c in r.cookies.keys()
+                    )),
+                ],
+                "min_score": 3,
+            },
+            "Drupal": {
+                "checks": [
+                    (4, "drupal" in meta_gen),
+                    (3, "/sites/default/files" in body_lower),
+                    (3, "drupal.settings" in body_lower),
+                    (3, headers_lower.get("x-drupal-cache","") != ""),
+                    (2, "drupal" in body_lower),
+                ],
+                "min_score": 3,  # needs strong signal
+            },
+            "Joomla": {
+                "checks": [
+                    (4, "joomla" in meta_gen),
+                    (3, "/media/jui/" in body_lower),
+                    (3, "/components/com_" in body_lower),
+                    (2, "joomla" in body_lower),
+                ],
+                "min_score": 3,
+            },
+            "Magento": {
+                "checks": [
+                    (4, "magento" in meta_gen),
+                    (3, "mage/cookies" in body_lower),
+                    (3, "varien" in body_lower),
+                    (3, headers_lower.get("x-magento-cache-debug","") != ""),
+                    (2, any(
+                        c.lower().startswith("frontend")
+                        for c in r.cookies.keys()
+                    )),
+                ],
+                "min_score": 4,  # high threshold — common false positive
+            },
+            "Laravel": {
+                "checks": [
+                    (4, any(
+                        c.lower() == "laravel_session"
+                        for c in r.cookies.keys()
+                    )),
+                    (4, any(
+                        c.lower() == "xsrf-token"
+                        for c in r.cookies.keys()
+                    )),
+                    (2, "laravel" in body_lower),
+                    (2, "php" in powered_by),
+                ],
+                "min_score": 4,  # needs definitive cookie
+            },
+            "Django": {
+                "checks": [
+                    (4, any(
+                        c.lower() == "csrftoken"
+                        for c in r.cookies.keys()
+                    )),
+                    (3, "csrfmiddlewaretoken" in body_lower),
+                    (2, "django" in body_lower),
+                ],
+                "min_score": 3,
+            },
+            "Ruby on Rails": {
+                "checks": [
+                    (4, headers_lower.get("x-runtime","") != ""),
+                    (3, "authenticity_token" in body_lower),
+                    (2, any(
+                        c.lower().endswith("_session")
+                        for c in r.cookies.keys()
+                    )),
+                ],
+                "min_score": 3,
+            },
+            "ASP.NET": {
+                "checks": [
+                    (4, "__viewstate" in body_lower),
+                    (4, headers_lower.get("x-aspnet-version","") != ""),
+                    (3, "asp.net" in powered_by),
+                    (3, any(
+                        c.lower() == "asp.net_sessionid"
+                        for c in r.cookies.keys()
+                    )),
+                ],
+                "min_score": 4,
+            },
+            "Next.js": {
+                "checks": [
+                    (4, "__next_data__" in body_lower),
+                    (3, "_next/static" in body_lower),
+                    (2, "next.js" in powered_by),
+                ],
+                "min_score": 3,
+            },
+            "React": {
+                "checks": [
+                    (3, "data-reactroot" in body_lower),
+                    (3, "_reactrootcontainer" in body_lower),
+                    (2, "react.development.js" in body_lower),
+                    # generic "react" alone = too weak, skip
+                ],
+                "min_score": 3,
+            },
+            "Vue.js": {
+                "checks": [
+                    (3, "data-v-" in body_lower),
+                    (3, "__vue__" in body_lower),
+                    (2, "vue.min.js" in body_lower),
+                ],
+                "min_score": 3,
+            },
+            "Angular": {
+                "checks": [
+                    (4, "ng-version=" in body_lower),
+                    (3, "_nghost" in body_lower),
+                    (3, "_ngcontent" in body_lower),
+                    (2, "angular.min.js" in body_lower),
+                ],
+                "min_score": 3,
+            },
+            "PHP": {
+                "checks": [
+                    (4, "php" in powered_by),
+                    (4, any(
+                        c.lower() == "phpsessid"
+                        for c in r.cookies.keys()
+                    )),
+                    # ".php" in URL is already known from request
+                ],
+                "min_score": 4,
+            },
+            "Spring Boot": {
+                "checks": [
+                    (4, headers_lower.get("x-application-context","") != ""),
+                    (4, any(
+                        c.lower() == "jsessionid"
+                        for c in r.cookies.keys()
+                    )),
+                    (2, "whitelabel error page" in body_lower),
+                ],
+                "min_score": 4,
+            },
+            "Nginx": {
+                "checks": [
+                    (4, "nginx" in server_header),
+                ],
+                "min_score": 4,  # server header is definitive
+            },
+            "Apache": {
+                "checks": [
+                    (4, "apache" in server_header),
+                ],
+                "min_score": 4,
+            },
+            "IIS": {
+                "checks": [
+                    (4, "microsoft-iis" in server_header),
+                    (3, "asp.net" in powered_by),
+                ],
+                "min_score": 4,
+            },
+            "Litespeed": {
+                "checks": [
+                    (4, "litespeed" in server_header),
+                ],
+                "min_score": 4,
+            },
+            "Tomcat": {
+                "checks": [
+                    (4, "apache-coyote" in server_header),
+                    (4, "apache tomcat" in server_header),
+                    (4, any(
+                        c.lower() == "jsessionid"
+                        for c in r.cookies.keys()
+                    )),
+                    (3, "apache tomcat" in body_lower),
+                ],
+                "min_score": 4,
+            },
+            # ── CDN / hosting ─────────────────────────────
+            "Cloudflare": {
+                "checks": [
+                    (4, "cf-ray" in headers_lower),
+                    (4, "cloudflare" in server_header),
+                    (3, "__cfduid" in cookie_str),
+                    (3, "cf-cache-status" in headers_lower),
+                ],
+                "min_score": 4,
+            },
+            "AWS CloudFront": {
+                "checks": [
+                    (4, "x-amz-cf-id" in headers_lower),
+                    (4, "x-amz-cf-pop" in headers_lower),
+                    (3, "cloudfront" in headers_lower.get("via","")),
+                ],
+                "min_score": 4,
+            },
+            "Fastly": {
+                "checks": [
+                    (4, "x-served-by" in headers_lower
+                        and "cache" in headers_lower.get("x-served-by","")),
+                    (4, "fastly-restarts" in headers_lower),
+                    (3, "fastly" in headers_lower.get("via","")),
+                ],
+                "min_score": 4,
+            },
+            "Vercel": {
+                "checks": [
+                    (4, "x-vercel-id" in headers_lower),
+                ],
+                "min_score": 4,
+            },
+            "Netlify": {
+                "checks": [
+                    (4, "x-nf-request-id" in headers_lower),
+                ],
+                "min_score": 4,
+            },
+            "GitHub Pages": {
+                "checks": [
+                    (4, server_header == "github.com"),
+                    (3, "github.io" in base_url),
+                ],
+                "min_score": 4,
+            },
+            # ── analytics ──────────────────────────────────
+            "Google Analytics": {
+                "checks": [
+                    (3, "google-analytics.com/analytics.js" in body_lower),
+                    (3, "gtag/js" in body_lower),
+                    (2, any(
+                        c.lower().startswith("_ga")
+                        for c in r.cookies.keys()
+                    )),
+                ],
+                "min_score": 3,
+            },
+            "Shopify": {
+                "checks": [
+                    (4, "cdn.shopify.com" in body_lower),
+                    (4, "shopify.theme" in body_lower),
+                    (4, headers_lower.get("x-shopid","") != ""),
+                ],
+                "min_score": 4,
+            },
+            "Wix": {
+                "checks": [
+                    (4, "static.wixstatic.com" in body_lower),
+                    (3, "wixsite.com" in body_lower),
+                ],
+                "min_score": 4,
+            },
+            "Squarespace": {
+                "checks": [
+                    (4, "static1.squarespace.com" in body_lower),
+                    (3, "squarespace.com" in body_lower),
+                ],
+                "min_score": 4,
+            },
+        }
 
-            # check body
-            if any(sig.lower() in body_lower for sig in sigs["body"]):
-                hit = True
-
-            # check header names
-            if any(h.lower() in headers_lower for h in sigs["headers"]):
-                # also check header values if specified
-                if "header_values" in sigs:
-                    for hv in sigs["header_values"]:
-                        for hk, hval in headers_lower.items():
-                            if hv in hval:
-                                hit = True
-                else:
-                    hit = True
-
-            # check cookies
-            if any(c.lower() in cookie_str for c in sigs["cookies"]):
-                hit = True
-
-            # check meta generator
-            if any(m.lower() in meta_gen for m in sigs["meta"]):
-                hit = True
-
-            if hit and tech_name not in detected:
+        # run scoring
+        for tech_name, sig in SIGNATURES.items():
+            score = sum(
+                points for points, condition in sig["checks"]
+                if condition
+            )
+            if score >= sig["min_score"]:
                 detected.append(tech_name)
+                confidence[tech_name] = score
 
     except Exception:
         pass
