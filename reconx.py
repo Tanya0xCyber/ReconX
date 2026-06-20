@@ -1331,40 +1331,44 @@ def main():
     )
     console.print()
 
-    try:
-        # ── stage 1: passive ───────────────────────────
-        run_stage("Passive Recon", run_passive_recon,
-                  (config["target"],), config, results)
-        if not config["quiet"]:
-            print_passive_results(results)
 
-        # ── stage 2: active ────────────────────────────
-        run_stage("Active Recon", run_active_recon,
-                  (config["target"], config["wordlist"]),
-                  config, results)
-        if not config["quiet"]:
-            print_active_results(results)
 
-        # ── stage 3: services ──────────────────────────
-        targets_to_scan = (
-            results.get("subdomains", [])[:5] + [config["target"]]
-        )
-        run_stage("Service Discovery", run_service_discovery,
-                  (targets_to_scan,), config, results)
-        if not config["quiet"]:
-            print_services_results(results)
+try:
+    # stage 1: passive — run silently, print after
+    run_stage("Passive Recon", run_passive_recon,
+              (config["target"],), config, results)
 
-        # ── stage 4: analysis ──────────────────────────
-        run_stage("Analysis Engine", run_analysis,
-                  (results,), config, results)
-        if not config["quiet"]:
-            print_analysis_results(results)
+    # stage 2: active
+    run_stage("Active Recon", run_active_recon,
+              (config["target"], config["wordlist"]),
+              config, results)
 
-    except KeyboardInterrupt:
-        console.print(
-            "\n  [yellow]⚠  interrupted — saving partial report...[/]\n"
-        )
+    # stage 3: services
+    targets_to_scan = (
+        results.get("subdomains", [])[:5] + [config["target"]]
+    )
+    run_stage("Service Discovery", run_service_discovery,
+              (targets_to_scan,), config, results)
 
+    # stage 4: analysis
+    run_stage("Analysis Engine", run_analysis,
+              (results,), config, results)
+
+except KeyboardInterrupt:
+    console.print(
+        "\n  [yellow]!  interrupted — saving partial report...[/]\n"
+    )
+
+# NOW print everything in the RIGHT order:
+# Executive summary first, raw data at bottom
+if not config["quiet"]:
+    print_executive_summary(results, config,
+                            time.time() - total_start)
+    print_passive_results(results)
+    print_active_results(results)
+    print_services_results(results)
+
+    
     # ── save report ────────────────────────────────────
     section("05 · Saving Report")
 
