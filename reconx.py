@@ -57,8 +57,9 @@ def print_banner():
     console.print(
         "  [dim white]recon pipeline[/]  [bright_green]·[/]  "
         "[dim white]bug bounty[/]  [bright_green]·[/]  "
-        "[dim white]pentest[/]"
-        " [dim]v1.0 · Tanya singh[/]"
+        "[dim white]pentest[/]  [bright_green]·[/]"
+         "\n"
+        " [dim] Tanya singh[/]"
     )
     console.print(
         "  [dim]" + "─" * 58 + "[/]"
