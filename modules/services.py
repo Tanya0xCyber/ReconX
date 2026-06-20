@@ -15,6 +15,7 @@ import time             # timeouts + delays
 import re               # regex for banner parsing
 import ssl              # SSL/TLS connections for banner grab
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
 import requests
 requests.packages.urllib3.disable_warnings()
@@ -535,30 +536,30 @@ def probe_http_service(host, port, config):
             # ── detect login pages ───────────────────────────────
 
             LOGIN_URL_SIGNALS = [
-               "/login",
-               "/signin",
-               "/sign-in",
-               "/auth",
-               "/account/login",
-              "/user/login",
-              "/wp-login.php",
-             "/session/new",
-           ]
+                 "/login",
+                 "/signin",
+                 "/sign-in",
+                 "/auth",
+                 "/account/login",
+                 "/user/login",
+                 "/wp-login.php",
+                 "/session/new",
+            ]
 
-           LOGIN_TITLE_SIGNALS = [
-              "sign in",
-              "log in",
-              "login",
-               "sign into",
-               "account login",
-           ]
+            LOGIN_TITLE_SIGNALS = [
+                "sign in",
+                "log in",
+                "login",
+                "sign into",
+                "account login",
+            ]
 
-           is_login = any(
-              sig in url_path
-              for sig in LOGIN_URL_SIGNALS
-           )
+            is_login = any(
+               sig in url_path
+               for sig in LOGIN_URL_SIGNALS
+            )
 
-           if not is_login and result["title"]:
+            if not is_login and result["title"]:
                 is_login = any(
                      sig in result["title"].lower()
                       for sig in LOGIN_TITLE_SIGNALS
