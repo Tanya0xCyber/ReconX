@@ -1153,15 +1153,15 @@ def print_executive_summary(results, config, elapsed):
           w in waf
           for w in ["Cloudflare WAF","Akamai WAF",
                   "Imperva","AWS WAF","F5 BIG-IP ASM"]
-         )
-         console.print(
+       )
+       console.print(
             f"  [dim]WAF[/]       [red]{' + '.join(waf)}[/]  "
             f"[dim]-> "
             + ("strong — focus IDOR / logic / origin IP"
                if strong else
                "present — injection may be filtered")
             + "[/]"
-         )
+       )
     else:
          console.print(
           "  [dim]WAF[/]       [dim]none detected[/]"
