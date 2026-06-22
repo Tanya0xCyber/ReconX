@@ -641,10 +641,10 @@ def print_active_results(results):
         console.print()
 
         def endpoint_label(path):
-    """
-    returns a specific label for an endpoint path.
-    avoids generic 'auth bypass' for every sensitive path.
-    """
+        """
+        returns a specific label for an endpoint path.
+        avoids generic 'auth bypass' for every sensitive path.
+        """
             p = path.lower()
             if "wp-admin" in p or "wp-login" in p:
                 return "WordPress admin — test auth controls"
