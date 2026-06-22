@@ -855,26 +855,24 @@ def print_analysis_results(results):
     dns       = results.get("dns_records", {})
 
     # ── WAF — one line ─────────────────────────────────
+    waf = results.get("waf", [])
+    cdn = results.get("cdn", [])
+
     if waf:
-        waf_str = " + ".join(waf)
-        # what to do based on WAF type
-        strong = any(
-            w in waf for w in ["Cloudflare","Akamai","Imperva"]
-        )
-        strategy = (
-            "skip injection scans → IDOR / logic / origin bypass"
-            if strong else
-            "encoded payloads may pass → manual injection testing"
-        )
-        console.print(
-            f"  [dim]WAF[/]      [yellow]{waf_str}[/]  "
-            f"[dim]→ {strategy}[/]"
-        )
-    else:
-        console.print(
-            "  [dim]WAF[/]      [red]None[/]  "
-            "[dim]→ full exposure — automated tools unimpeded[/]"
-        )
+       console.print(
+          f"  [dim]WAF[/]  [red]{' + '.join(waf)}[/]  "
+          f"[dim]-> confirmed security filtering[/]"
+       )
+    if cdn:
+       console.print(
+          f"  [dim]CDN[/]  [yellow]{' + '.join(cdn)}[/]  "
+          f"[dim]-> traffic acceleration, not WAF[/]"
+       )
+    if not waf and not cdn:
+       console.print(
+          "  [dim]WAF / CDN  none detected[/]"
+       )
+    console.print()
 
     # ── Tech — mapped to attack direction ──────────────
    
