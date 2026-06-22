@@ -669,18 +669,17 @@ for e in crit_eps[:3]:
         f"  [red]>[/]  [white]{e}[/]  "
         f"[dim]<- {endpoint_label(e)}[/]"
     )
-
-
-        for e in auth_eps[:3]:
-            console.print(
-                f"  [yellow]▸[/]  [white]{e}[/]  "
-                f"[dim]← brute-force / token reuse[/]"
-            )
-        if other_eps:
-            console.print(
-                f"  [dim]+ {len(other_eps)} general endpoints in report[/]"
-            )
-        console.print()
+    
+for e in auth_eps[:3]:
+    console.print(
+         f"  [yellow]▸[/]  [white]{e}[/]  "
+         f"[dim]← brute-force / token reuse[/]"
+    )
+if other_eps:
+    console.print(
+         f"  [dim]+ {len(other_eps)} general endpoints in report[/]"
+    )
+console.print()
 
     # emails — one line
     if emails:
