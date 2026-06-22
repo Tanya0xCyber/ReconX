@@ -1180,7 +1180,7 @@ def print_executive_summary(results, config, elapsed):
     if tech:
          console.print()
 
-        # group by category
+              # group by category
               categories = {
                   "Web Server": ["Nginx","Apache","IIS","Litespeed","Tomcat"],
                   "Framework":  ["Laravel","Django","Ruby on Rails","ASP.NET",
