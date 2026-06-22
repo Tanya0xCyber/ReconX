@@ -681,19 +681,19 @@ if other_eps:
     )
 console.print()
 
-    # emails — one line
-    if emails:
-        cat       = results.get("email_harvest",{}).get("categorized",{})
-        sec_mails = cat.get("security",[])
-        console.print(
-            f"  [dim]Emails[/]  [white]{len(emails)} harvested[/]"
-            + (f"  [bright_green]· {len(sec_mails)} security contact(s)[/]"
-               if sec_mails else "")
-        )
-        if sec_mails:
-            for e in sec_mails[:2]:
-                console.print(f"  [dim]  ·[/] [white]{e}[/]")
-        console.print()
+ # emails — one lin
+if emails:
+     cat       = results.get("email_harvest",{}).get("categorized",{})
+     sec_mails = cat.get("security",[])
+     console.print(
+          f"  [dim]Emails[/]  [white]{len(emails)} harvested[/]"
+          + (f"  [bright_green]· {len(sec_mails)} security contact(s)[/]"
+          if sec_mails else "")
+     )
+     if sec_mails:
+         for e in sec_mails[:2]:
+            console.print(f"  [dim]  ·[/] [white]{e}[/]")
+     console.print()
 
 
 def print_services_results(results):
