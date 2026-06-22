@@ -159,104 +159,103 @@ def run_dns_records(domain, config):
     - SPF records in TXT show all authorized mail senders
     """
 
-    records = {
-        "A":     [],
-        "AAAA":  [],
-        "MX":    [],
-        "NS":    [],
-        "TXT":   [],
-        "CNAME": [],
-        "SOA":   [],
-        "CAA":   [],
-        "error": None,
+
+    results = {
+        "spf":   {"present": False, "confidence": "unknown", "value": ""},
+        "dmarc": {"present": False, "confidence": "unknown", "value": ""},
     }
 
-    record_types = ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA", "CAA"]
+    timeout = config.get("timeout", 5)
 
-    if DNS_LIB:
-        # use dnspython — more reliable and detailed
-        resolver = dns.resolver.Resolver()
-        resolver.timeout     = config.get("timeout", 5)
-        resolver.lifetime    = config.get("timeout", 5)
-
-        for rtype in record_types:
+    # check SPF — look for v=spf1 in TXT records
+    try:
+        if DNS_LIB:
+            resolver = dns.resolver.Resolver()
+            resolver.timeout  = timeout
+            resolver.lifetime = timeout
             try:
-                answers = resolver.resolve(domain, rtype)
-
+                answers = resolver.resolve(domain, "TXT")
+                # lookup succeeded — we can trust the result
+                spf_found = False
                 for rdata in answers:
-                    val = str(rdata).rstrip(".")
-
-                    # MX records have a priority number — include it
-                    if rtype == "MX":
-                        records[rtype].append({
-                            "priority": rdata.preference,
-                            "host":     str(rdata.exchange).rstrip(".")
-                        })
-                    else:
-                        records[rtype].append(val)
+                    txt = str(rdata).strip('"')
+                    if txt.startswith("v=spf1"):
+                        spf_found = True
+                        results["spf"]["value"] = txt[:80]
+                        break
+                results["spf"]["present"]    = spf_found
+                results["spf"]["confidence"] = "high"
+                # confidence is high because lookup succeeded
+                # and we can confirm presence or absence
 
             except dns.resolver.NXDOMAIN:
-                # domain doesn't exist
-                records["error"] = "Domain does not exist (NXDOMAIN)"
-                break
+                # domain doesn't exist at all
+                results["spf"]["confidence"] = "high"
+                results["spf"]["present"]    = False
 
             except dns.resolver.NoAnswer:
-                # no records of this type — normal, just skip
-                pass
+                # lookup succeeded but no TXT records
+                results["spf"]["confidence"] = "high"
+                results["spf"]["present"]    = False
 
             except dns.resolver.Timeout:
-                pass
+                # DNS timed out — we don't know
+                results["spf"]["confidence"] = "low"
+                results["spf"]["present"]    = False
 
             except Exception:
-                pass
+                results["spf"]["confidence"] = "low"
+                results["spf"]["present"]    = False
+        else:
+            # no dnspython — using socket which can't do TXT
+            results["spf"]["confidence"] = "low"
 
-    else:
-        # fallback to socket — only gets A records
-        try:
-            infos = socket.getaddrinfo(domain, None)
-            for info in infos:
-                ip = info[4][0]
-                if ":" in ip:
-                    # IPv6 addresses contain colons
-                    if ip not in records["AAAA"]:
-                        records["AAAA"].append(ip)
-                else:
-                    if ip not in records["A"]:
-                        records["A"].append(ip)
-        except Exception as e:
-            records["error"] = str(e)
+    except Exception:
+        results["spf"]["confidence"] = "low"
 
-    # ── bonus: scan TXT records for interesting tokens ─────────────────────
-    # TXT records often contain secrets left by devs verifying services
-    interesting_txt = []
-    txt_patterns = {
-        "SPF record":           r"v=spf1",
-        "DKIM record":          r"v=DKIM1",
-        "DMARC record":         r"v=DMARC1",
-        "Google verification":  r"google-site-verification",
-        "Stripe verification":  r"stripe-verification",
-        "AWS SES":              r"amazonses",
-        "Atlassian/Jira":       r"atlassian-domain-verification",
-        "Facebook domain":      r"facebook-domain-verification",
-        "Zoho mail":            r"zoho-verification",
-        "Mailgun":              r"mailgun",
-        "SendGrid":             r"sendgrid",
-        "HubSpot":              r"hubspot",
-        "MS Office365":         r"MS=ms",
-        "Docusign":             r"docusign",
-    }
+    # check DMARC — query _dmarc.domain TXT record
+    try:
+        dmarc_domain = f"_dmarc.{domain}"
+        if DNS_LIB:
+            resolver = dns.resolver.Resolver()
+            resolver.timeout  = timeout
+            resolver.lifetime = timeout
+            try:
+                answers = resolver.resolve(dmarc_domain, "TXT")
+                dmarc_found = False
+                for rdata in answers:
+                    txt = str(rdata).strip('"')
+                    if txt.startswith("v=DMARC1"):
+                        dmarc_found = True
+                        results["dmarc"]["value"] = txt[:80]
+                        break
+                results["dmarc"]["present"]    = dmarc_found
+                results["dmarc"]["confidence"] = "high"
 
-    for txt_val in records["TXT"]:
-        for service, pattern in txt_patterns.items():
-            if re.search(pattern, txt_val, re.I):
-                interesting_txt.append({
-                    "service": service,
-                    "value":   txt_val[:120]
-                })
+            except dns.resolver.NXDOMAIN:
+                # _dmarc record doesn't exist — confirmed missing
+                results["dmarc"]["present"]    = False
+                results["dmarc"]["confidence"] = "high"
 
-    records["interesting_txt"] = interesting_txt
+            except dns.resolver.NoAnswer:
+                results["dmarc"]["present"]    = False
+                results["dmarc"]["confidence"] = "high"
 
-    return records
+            except dns.resolver.Timeout:
+                # timed out — don't report as missing
+                results["dmarc"]["confidence"] = "low"
+                results["dmarc"]["present"]    = False
+
+            except Exception:
+                results["dmarc"]["confidence"] = "low"
+
+        else:
+            results["dmarc"]["confidence"] = "low"
+
+    except Exception:
+        results["dmarc"]["confidence"] = "low"
+
+    return results
 
 
 # ══════════════════════════════════════════════════════
@@ -549,6 +548,9 @@ def run_passive_recon(domain, config):
 
     dns_data = run_dns_records(domain, config)
     results["dns_records"] = dns_data
+      # after run_dns_records()
+    email_security = check_spf_dmarc(domain, config)
+    results["email_security"] = email_security
 
     # grab the IP from DNS A records for later use
     # fall back to socket if DNS module didn't get it
