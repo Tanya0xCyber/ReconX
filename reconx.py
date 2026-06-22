@@ -640,11 +640,36 @@ def print_active_results(results):
         )
         console.print()
 
-        for e in crit_eps[:4]:
-            console.print(
-                f"  [red]▸[/]  [white]{e}[/]  "
-                f"[dim]← auth bypass / config leak[/]"
-            )
+        def endpoint_label(path):
+    """
+    returns a specific label for an endpoint path.
+    avoids generic 'auth bypass' for every sensitive path.
+    """
+            p = path.lower()
+            if "wp-admin" in p or "wp-login" in p:
+                return "WordPress admin — test auth controls"
+            if "xmlrpc" in p:
+                return "WordPress XMLRPC — test brute-force / DoS"
+            if "admin-ajax" in p:
+                return "WordPress AJAX — review authorization"
+            if "config" in p:
+                return "Config endpoint — check if auth required"
+            if "debug" in p or "trace" in p:
+                return "Debug endpoint — should not be public"
+            if "backup" in p or ".bak" in p:
+                return "Backup file — check if accessible"
+            if "internal" in p:
+                return "Internal endpoint — verify access controls"
+            if "secret" in p or "key" in p:
+                return "Sensitive path — check response content"
+            return "Sensitive path — review access controls"
+
+       for e in crit_eps[:3]:
+           console.print(
+              f"  [red]>[/]  [white]{e}[/]  "
+              f"[dim]<- {endpoint_label(e)}[/]"
+           )
+
         for e in auth_eps[:3]:
             console.print(
                 f"  [yellow]▸[/]  [white]{e}[/]  "
@@ -1117,30 +1142,45 @@ def print_executive_summary(results, config, elapsed):
         console.print()
 
     # ── fingerprinting ─────────────────────────────────
+    
+    waf = results.get("waf", [])
+    cdn = results.get("cdn", [])
+
     console.print("  [bold bright_green]Fingerprinting[/]")
     console.print()
 
+    # WAF — only if true WAF detected
     if waf:
-        strong = any(
-            w in waf
-            for w in ["Cloudflare","Akamai","Imperva","AWS WAF","F5"]
-        )
-        console.print(
-            f"  [dim]WAF / CDN[/]   [yellow]{' + '.join(waf)}[/]  "
+       strong = any(
+          w in waf
+          for w in ["Cloudflare WAF","Akamai WAF",
+                  "Imperva","AWS WAF","F5 BIG-IP ASM"]
+         )
+         console.print(
+            f"  [dim]WAF[/]       [red]{' + '.join(waf)}[/]  "
             f"[dim]-> "
-            + ("injection blocked — focus IDOR / logic / origin IP"
+            + ("strong — focus IDOR / logic / origin IP"
                if strong else
-               "weak WAF — injection testing viable")
+               "present — injection may be filtered")
             + "[/]"
-        )
+         )
     else:
-        console.print(
-            "  [dim]WAF / CDN[/]   [red]none detected[/]  "
-            "[dim]-> no blocking — all testing methods viable[/]"
-        )
+         console.print(
+          "  [dim]WAF[/]       [dim]none detected[/]"
+         )
 
+    # CDN — separate from WAF
+    if cdn:
+         console.print(
+         f"  [dim]CDN[/]       [yellow]{' + '.join(cdn)}[/]  "
+         f"[dim]-> real IP hidden — find origin[/]"
+         )
+    else:
+         console.print(
+         "  [dim]CDN[/]       [dim]none detected[/]"
+         )   
     if tech:
-        console.print()
+         console.print()
 
         # group by category
         categories = {
