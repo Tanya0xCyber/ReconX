@@ -1178,45 +1178,45 @@ def print_executive_summary(results, config, elapsed):
          "  [dim]CDN[/]       [dim]none detected[/]"
          )   
     if tech:
-         console.print()
-
-              # group by category
-              categories = {
-                  "Web Server": ["Nginx","Apache","IIS","Litespeed","Tomcat"],
-                  "Framework":  ["Laravel","Django","Ruby on Rails","ASP.NET",
+        console.print()
+         # group by category
+        categories = {
+              "Web Server": ["Nginx","Apache","IIS","Litespeed","Tomcat"],
+              "Framework":  ["Laravel","Django","Ruby on Rails","ASP.NET",
                                  "Spring Boot","Symfony","Flask","PHP"],
-                  "Frontend":   ["React","Vue.js","Angular","Next.js",
+              "Frontend":   ["React","Vue.js","Angular","Next.js",
                                   "jQuery","Bootstrap"],
-                  "CMS":        ["WordPress","Drupal","Joomla","Magento",
+              "CMS":        ["WordPress","Drupal","Joomla","Magento",
                                    "Shopify","Wix","Squarespace","WooCommerce"],
-                  "CDN / Host": ["Cloudflare Pages","AWS CloudFront","Fastly",
+              "CDN / Host": ["Cloudflare Pages","AWS CloudFront","Fastly",
                                 "Vercel","Netlify","GitHub Pages","Cloudflare"],
-              }
+        }
 
-              tech_attack = {
-                   "WordPress":       "xmlrpc.php · plugin CVEs · /wp-admin BF",
-                    "Drupal":          "Drupalgeddon CVEs · module exploits",
-                   "Joomla":          "component vulns · admin panel BF",
-                   "Magento":         "admin panel · Magmi upload · SQLi history",
-                    "Laravel":         ".env leak · APP_DEBUG=true",
-                   "Django":          "DEBUG mode · /admin BF · CSRF on APIs",
-                   "ASP.NET":         "ViewState deser · IIS shortname",
-                   "Next.js":         "/_next/data/ unauthed · API route auth",
-                  "React":           "secrets in bundle · JWT in localStorage",
-                   "Angular":         "env vars in bundle · source maps",
-                  "PHP":             "LFI / RFI · type juggling",
-                   "Nginx":           "alias traversal · proxy open redirect",
-                   "Apache":          "dir listing · .htaccess bypass",
-                   "IIS":             "shortname vuln · WebDAV",
-                 "Spring Boot":     "/actuator — info disclosure",
-                   "Tomcat":          "manager default creds · PUT method",
-                  "Shopify":         "IDOR · checkout bypass · discount abuse",
-                  "Cloudflare Pages":"find origin IP · focus app logic",
-                  "Cloudflare":      "find origin IP · bypass CDN",
-                   "Vercel":          "find origin · env var leaks in JS",
-                  "Netlify":         "find origin · build log exposure",
-                  "AWS CloudFront":  "find origin · S3 bucket check",
-               }
+        tech_attack = {
+               "WordPress":       "xmlrpc.php · plugin CVEs · /wp-admin BF",
+               "Drupal":          "Drupalgeddon CVEs · module exploits",
+               "Joomla":          "component vulns · admin panel BF",
+               "Magento":         "admin panel · Magmi upload · SQLi history",
+               "Laravel":         ".env leak · APP_DEBUG=true",
+               "Django":          "DEBUG mode · /admin BF · CSRF on APIs",
+               "ASP.NET":         "ViewState deser · IIS shortname",
+               "Next.js":         "/_next/data/ unauthed · API route auth",
+               "React":           "secrets in bundle · JWT in localStorage",
+               "Angular":         "env vars in bundle · source maps",
+               "PHP":             "LFI / RFI · type juggling",
+               "Nginx":           "alias traversal · proxy open redirect",
+               "Apache":          "dir listing · .htaccess bypass",
+               "IIS":             "shortname vuln · WebDAV",
+               "Spring Boot":     "/actuator — info disclosure",
+               "Tomcat":          "manager default creds · PUT method",
+               "Shopify":         "IDOR · checkout bypass · discount abuse",
+               "Cloudflare Pages":"find origin IP · focus app logic",
+               "Cloudflare":      "find origin IP · bypass CDN",
+               "Vercel":          "find origin · env var leaks in JS",
+               "Netlify":         "find origin · build log exposure",
+               "AWS CloudFront":  "find origin · S3 bucket check",
+        }    
+             
 
         all_cat_members = [m for ms in categories.values() for m in ms]
         shown = set()
