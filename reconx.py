@@ -664,11 +664,12 @@ def endpoint_label(path):
         return "Sensitive path — check response content"
     return "Sensitive path — review access controls"
 
-        for e in crit_eps[:3]:
-            console.print(
-                 f"  [red]>[/]  [white]{e}[/]  "
-                 f"[dim]<- {endpoint_label(e)}[/]"
-            )
+for e in crit_eps[:3]:
+    console.print(
+        f"  [red]>[/]  [white]{e}[/]  "
+        f"[dim]<- {endpoint_label(e)}[/]"
+    )
+
 
         for e in auth_eps[:3]:
             console.print(
