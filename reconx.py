@@ -445,7 +445,6 @@ def print_passive_results(results):
             )
         console.print()
 
-
 def print_active_results(results):
     """active recon — filtered, high-value only"""
 
@@ -458,14 +457,14 @@ def print_active_results(results):
     endpoints = results.get("js_endpoints", [])
     emails    = results.get("emails", [])
 
-    # takeovers — always top
+    # takeovers — always first
     if takeovers:
         for t in takeovers:
             console.print(
-                f"  [bold red]⚑ TAKEOVER[/]  "
+                f"  [bold red]TAKEOVER[/]  "
                 f"[bold white]{t.get('subdomain','')}[/]  "
-                f"[dim]→[/]  [red]{t.get('service','')}[/]  "
-                f"[dim]register account → own subdomain[/]"
+                f"[dim]->[/]  [red]{t.get('service','')}[/]  "
+                f"[dim]register account -> own subdomain[/]"
             )
         console.print()
 
@@ -498,12 +497,14 @@ def print_active_results(results):
 
                 st = (
                     f"[bright_green]{status}[/]" if status == 200
-                    else f"[yellow]{status}[/]" if str(status).startswith("3")
-                    else f"[red]{status}[/]" if status in [401,403]
+                    else f"[yellow]{status}[/]"
+                    if str(status).startswith("3")
+                    else f"[red]{status}[/]"
+                    if status in [401,403]
                     else f"[dim]{status}[/]"
                 )
                 console.print(
-                    f"  [red]▸[/]  [bold white]{name}[/]  "
+                    f"  [red]>[/]  [bold white]{name}[/]  "
                     f"{st}  [{color}][{tag}][/{color}]"
                     + (f"  [dim]{title}[/]" if title else "")
                 )
@@ -528,19 +529,16 @@ def print_active_results(results):
 
         if standard:
             console.print(
-                f"  [dim]+ {len(standard)} standard subdomains in report[/]"
+                f"  [dim]+ {len(standard)} standard in report[/]"
             )
             console.print()
 
-    # JS secrets — compact, with use case
-    # REPLACE the JS secrets block with this:
-
+    # JS findings — properly categorized
     if secrets:
-    # categorize properly — internal IPs are NOT secrets
         real_secrets = [
             s for s in secrets
             if "Internal IP" not in s.get("type","")
-            and "Generic" not in s.get("type","")
+            and s.get("type","") not in ["Generic API Key","Generic Secret"]
         ]
         internal_ips = [
             s for s in secrets
@@ -548,43 +546,37 @@ def print_active_results(results):
         ]
         generic = [
             s for s in secrets
-            if "Generic" in s.get("type","")
-            or ("API Key" in s.get("type","")
-                and not any(
-                    x in s.get("type","")
-                    for x in ["AWS","GitHub","Stripe","Firebase"]
-                ))
+            if s.get("type","") in ["Generic API Key","Generic Secret"]
         ]
 
         console.print("  [bold bright_green]JS Analysis[/]")
         console.print()
         console.print(
-            f"  [dim]  Credentials / Keys  [/]  "
-            f"[{'red' if real_secrets else 'dim'}]"
-            f"{len(real_secrets)}"
-            f"[/]"
+            f"  [dim]  Credentials / Keys[/]  "
+            + (f"[red]{len(real_secrets)}[/]"
+               if real_secrets else f"[dim]{len(real_secrets)}[/]")
         )
         console.print(
-            f"  [dim]  Generic references  [/]  "
-            f"[{'yellow' if generic else 'dim'}]{len(generic)}[/]"
+            f"  [dim]  Generic references[/]  "
+            + (f"[yellow]{len(generic)}[/]"
+               if generic else f"[dim]{len(generic)}[/]")
         )
         console.print(
-            f"  [dim]  Internal IPs        [/]  "
+            f"  [dim]  Internal IPs      [/]  "
             f"[bright_blue]{len(internal_ips)}[/]"
-            + (f"  [dim](infrastructure hints, not secrets)[/]"
+            + ("  [dim](infra hints, not secrets)[/]"
                if internal_ips else "")
         )
         console.print()
 
-    # show real secrets with use case
         secret_use = {
             "AWS":      "-> aws cli s3 ls / iam enumerate",
-             "GitHub":   "-> clone private repos",
+            "GitHub":   "-> clone private repos",
             "Stripe":   "-> charge cards / read customer PII",
-                "Firebase": "-> read/write DB if rules permissive",
+            "Firebase": "-> read/write DB if rules permissive",
             "JWT":      "-> decode -> alg confusion -> forge",
             "Slack":    "-> read messages / post as bot",
-        }    
+        }
 
         for s in real_secrets[:6]:
             stype  = s.get("type","")
@@ -598,39 +590,45 @@ def print_active_results(results):
             )
             console.print(
                 f"  [red]>[/]  [white]{stype}[/]  "
-                f"[red]{masked}[/]  "
-                f"[dim]{use}[/]"
+                f"[red]{masked}[/]  [dim]{use}[/]"
             )
             if file:
                 console.print(f"  [dim]     {file}[/]")
-        console.print()
 
-    # internal IPs separately — different category
         if internal_ips:
-            console.print(
-                "  [bright_blue]Internal infrastructure references:[/]"
-            )
-            for s in internal_ips[:4]:
+            console.print()
+            console.print("  [bright_blue]Internal IPs:[/]")
+            for s in internal_ips[:3]:
                 console.print(
                     f"  [bright_blue]>[/]  "
-                     f"[white]{s.get('value','')[:40]}[/]  "
-                    f"[dim]-> map internal network / pivot targets[/]"
+                    f"[white]{s.get('value','')[:40]}[/]  "
+                    f"[dim]-> internal network reference[/]"
                 )
-            console.print()
+
+        console.print()
+
     else:
         console.print("  [dim]JS Analysis — no findings[/]")
         console.print()
-        
-    # API endpoints — categorized, no noise
+
+    # API endpoints — categorized
     if endpoints:
-        crit_eps  = [e for e in endpoints
-                     if any(x in e.lower()
-                            for x in ["admin","config","debug","internal","secret","backup","root"])]
-        auth_eps  = [e for e in endpoints
-                     if any(x in e.lower()
-                            for x in ["auth","login","token","oauth","password","reset","register"])]
-        other_eps = [e for e in endpoints
-                     if e not in crit_eps and e not in auth_eps]
+        crit_eps = [
+            e for e in endpoints
+            if any(x in e.lower()
+                   for x in ["admin","config","debug",
+                              "internal","secret","backup","root"])
+        ]
+        auth_eps = [
+            e for e in endpoints
+            if any(x in e.lower()
+                   for x in ["auth","login","token",
+                              "oauth","password","reset","register"])
+        ]
+        other_eps = [
+            e for e in endpoints
+            if e not in crit_eps and e not in auth_eps
+        ]
 
         console.print(
             f"  [bold bright_green]Endpoints[/]  "
@@ -640,60 +638,58 @@ def print_active_results(results):
         )
         console.print()
 
-def endpoint_label(path):
-    """
-    returns a specific label for an endpoint path.
-    avoids generic 'auth bypass' for every sensitive path.
-    """
-    p = path.lower()
-    if "wp-admin" in p or "wp-login" in p:
-        return "WordPress admin — test auth controls"
-    if "xmlrpc" in p:
-        return "WordPress XMLRPC — test brute-force / DoS"
-    if "admin-ajax" in p:
-        return "WordPress AJAX — review authorization"
-    if "config" in p:
-        return "Config endpoint — check if auth required"
-    if "debug" in p or "trace" in p:
-        return "Debug endpoint — should not be public"
-    if "backup" in p or ".bak" in p:
-        return "Backup file — check if accessible"
-    if "internal" in p:
-        return "Internal endpoint — verify access controls"
-    if "secret" in p or "key" in p:
-        return "Sensitive path — check response content"
-    return "Sensitive path — review access controls"
+        def endpoint_label(path):
+            """specific label per endpoint type — no generic messages"""
+            p = path.lower()
+            if "wp-admin" in p or "wp-login" in p:
+                return "WordPress admin — test auth controls"
+            if "xmlrpc" in p:
+                return "WordPress XMLRPC — test brute-force / DoS"
+            if "admin-ajax" in p:
+                return "WordPress AJAX — review authorization"
+            if "config" in p:
+                return "Config endpoint — check if auth required"
+            if "debug" in p or "trace" in p:
+                return "Debug endpoint — should not be public"
+            if "backup" in p or ".bak" in p:
+                return "Backup file — check if accessible"
+            if "internal" in p:
+                return "Internal endpoint — verify access controls"
+            if "secret" in p or "key" in p:
+                return "Sensitive path — check response content"
+            return "Sensitive path — review access controls"
 
-for e in crit_eps[:3]:
-    console.print(
-        f"  [red]>[/]  [white]{e}[/]  "
-        f"[dim]<- {endpoint_label(e)}[/]"
-    )
-    
-for e in auth_eps[:3]:
-    console.print(
-         f"  [yellow]▸[/]  [white]{e}[/]  "
-         f"[dim]← brute-force / token reuse[/]"
-    )
-if other_eps:
-    console.print(
-         f"  [dim]+ {len(other_eps)} general endpoints in report[/]"
-    )
-console.print()
+        for e in crit_eps[:3]:
+            console.print(
+                f"  [red]>[/]  [white]{e}[/]  "
+                f"[dim]<- {endpoint_label(e)}[/]"
+            )
 
- # emails — one lin
-if emails:
-     cat       = results.get("email_harvest",{}).get("categorized",{})
-     sec_mails = cat.get("security",[])
-     console.print(
-          f"  [dim]Emails[/]  [white]{len(emails)} harvested[/]"
-          + (f"  [bright_green]· {len(sec_mails)} security contact(s)[/]"
-          if sec_mails else "")
-     )
-     if sec_mails:
-         for e in sec_mails[:2]:
-            console.print(f"  [dim]  ·[/] [white]{e}[/]")
-     console.print()
+        for e in auth_eps[:2]:
+            console.print(
+                f"  [yellow]>[/]  [white]{e}[/]  "
+                f"[dim]<- brute-force / token reuse[/]"
+            )
+
+        if other_eps:
+            console.print(
+                f"  [dim]+ {len(other_eps)} general in report[/]"
+            )
+        console.print()
+
+    # emails — one line
+    if emails:
+        cat       = results.get("email_harvest",{}).get("categorized",{})
+        sec_mails = cat.get("security",[])
+        console.print(
+            f"  [dim]Emails[/]  [white]{len(emails)} harvested[/]"
+            + (f"  [bright_green]· {len(sec_mails)} security contact(s)[/]"
+               if sec_mails else "")
+        )
+        if sec_mails:
+            for e in sec_mails[:2]:
+                console.print(f"  [dim]  ·[/]  [white]{e}[/]")
+        console.print()
 
 
 def print_services_results(results):
