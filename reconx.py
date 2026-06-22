@@ -640,7 +640,7 @@ def print_active_results(results):
         )
         console.print()
 
-        def endpoint_label(path):
+def endpoint_label(path):
         """
         returns a specific label for an endpoint path.
         avoids generic 'auth bypass' for every sensitive path.
