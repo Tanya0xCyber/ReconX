@@ -400,9 +400,9 @@ def print_passive_results(results):
                "[bright_green]present[/]"
                 if dmarc_present else
                 "[red]missing[/]  [dim]-> domain spoofable[/]"
-            )
-            console.print(f"  [dim]DMARC[/]   {dmarc_str}")
-        # if both unknown — show nothing, not wrong info
+           )
+           console.print(f"  [dim]DMARC[/]   {dmarc_str}")
+            # if both unknown — show nothing, not wrong info
 
     # Geo
     geo = results.get("geo_asn", {})
