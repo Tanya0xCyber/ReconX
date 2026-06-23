@@ -861,9 +861,12 @@ def print_services_results(results):
                   "XFO missing  — page can be embedded in iframe",
                "X-Content-Type-Options":
                   "XCTO missing — MIME sniffing attacks possible",
-               "Referrer-Policy":
-                  "RP missing   — referrer leaks to third parties",
+               
             }
+            common = Counter([
+                h for h in all_missing
+                if h != "Referrer-Policy"    # skip RP — low value
+            ]).most_common(3)
 
             console.print("  [bright_blue]Missing security headers:[/]")
             console.print()
