@@ -370,24 +370,41 @@ def print_passive_results(results):
                 console.print("  [dim]       M365 — O365 phishing highly effective, check MFA[/]")
 
         # Email security — compact table
-        interesting = dns.get("interesting_txt", [])
-        has_spf   = any("SPF"   in i.get("service","") for i in interesting)
-        has_dmarc = any("DMARC" in i.get("service","") for i in interesting)
+        # Email security — use explicit DNS lookup results
+        # not the TXT parsing which can miss records
+        email_sec  = results.get("email_security", {})
+        spf_data   = email_sec.get("spf",   {})
+        dmarc_data = email_sec.get("dmarc", {})
+
+        spf_present   = spf_data.get("present", False)
+        spf_conf      = spf_data.get("confidence", "low")
+        dmarc_present = dmarc_data.get("present", False)
+        dmarc_conf    = dmarc_data.get("confidence", "low")
 
         console.print()
-        spf_str   = "[bright_green]✓[/]" if has_spf   else "[red]✗ Missing[/]  [dim]→ spoofable[/]"
-        dmarc_str = "[bright_green]✓[/]" if has_dmarc else "[red]✗ Missing[/]  [dim]→ domain spoofable even with SPF[/]"
+
+        # only show result when confidence is high
+        # low confidence = DNS timed out = we don't actually know
+        if spf_conf == "high":
+            spf_str = (
+               "[bright_green]present[/]"
+               if spf_present else
+              "[red]missing[/]  [dim]-> spoofable[/]"
+        )
+        else:
+            spf_str = "[dim]unknown (lookup failed)[/]"
+
+        if dmarc_conf == "high":
+             dmarc_str = (
+                "[bright_green]present[/]"
+                if dmarc_present else
+                "[red]missing[/]  [dim]-> domain spoofable[/]"
+         )
+        else:
+            dmarc_str = "[dim]unknown (lookup failed)[/]"
+
         console.print(f"  [dim]SPF  [/]   {spf_str}")
         console.print(f"  [dim]DMARC[/]   {dmarc_str}")
-
-        if interesting:
-            svcs = [i.get("service","") for i in interesting if "SPF" not in i.get("service","") and "DMARC" not in i.get("service","")]
-            if svcs:
-                console.print(
-                    f"  [dim]TXT  [/]   "
-                    + "  ".join(f"[bright_green]{s}[/]" for s in svcs[:4])
-                )
-        console.print()
 
     # Geo
     geo = results.get("geo_asn", {})
@@ -784,8 +801,19 @@ def print_services_results(results):
     all_std = len(std_ports) + len([p for p in web_ports
                                     if p[0].get("port","") in {80,443}])
     if all_std:
-        console.print(f"  [dim]Standard ports: {all_std}[/]")
-        console.print()
+    # collect the actual port numbers for display
+    std_nums = []
+    for p in std_ports:
+        std_nums.append(str(p.get("port","")))
+    for p, label, opp in web_ports:
+        if p.get("port","") in {80, 443}:
+            std_nums.append(str(p.get("port","")))
+
+    console.print(
+        f"  [dim]Standard ports ({all_std}):[/]  "
+        f"[dim]{' · '.join(std_nums[:6])}[/]"
+    )
+    console.print()
 
     # HTTP services — admin / login flags only
     if http:
@@ -812,19 +840,36 @@ def print_services_results(results):
                 )
             console.print()
 
-        if hdr_g:
-            # just the most common missing header
-            from collections import Counter
-            all_missing = []
-            for s in hdr_g:
-                all_missing.extend(s.get("missing_headers",[]))
+        # missing headers — explained in plain English
+        from collections import Counter
+        all_missing = []
+        for s in http:
+             all_missing.extend(s.get("missing_headers",[]))
+
+        if all_missing:
             common = Counter(all_missing).most_common(3)
-            gaps = "  ·  ".join(
-                f"{h} ({c}x)" for h,c in common
-            )
-            console.print(
-                f"  [bright_blue]Missing headers:[/]  [dim]{gaps}[/]"
-            )
+
+            header_explain = {
+               "Strict-Transport-Security":
+                  "HSTS missing — browser may downgrade to HTTP",
+               "Content-Security-Policy":
+                  "CSP missing  — XSS payloads execute unrestricted",
+               "X-Frame-Options":
+                  "XFO missing  — page can be embedded in iframe",
+               "X-Content-Type-Options":
+                  "XCTO missing — MIME sniffing attacks possible",
+               "Referrer-Policy":
+                  "RP missing   — referrer leaks to third parties",
+            }
+
+            console.print("  [bright_blue]Missing security headers:[/]")
+            console.print()
+            for hdr, count in common:
+                 explain = header_explain.get(hdr, f"{hdr} missing")
+                 console.print(
+                     f"  [bright_blue]>[/]  [white]{explain}[/]  "
+                     f"[dim]({count} service(s))[/]"
+                 )
             console.print()
 
 
