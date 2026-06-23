@@ -801,19 +801,19 @@ def print_services_results(results):
     all_std = len(std_ports) + len([p for p in web_ports
                                     if p[0].get("port","") in {80,443}])
     if all_std:
-    # collect the actual port numbers for display
-    std_nums = []
-    for p in std_ports:
-        std_nums.append(str(p.get("port","")))
-    for p, label, opp in web_ports:
-        if p.get("port","") in {80, 443}:
-            std_nums.append(str(p.get("port","")))
+        # collect the actual port numbers for display
+        std_nums = []
+        for p in std_ports:
+           std_nums.append(str(p.get("port","")))
+        for p, label, opp in web_ports:
+           if p.get("port","") in {80, 443}:
+               std_nums.append(str(p.get("port","")))
 
-    console.print(
-        f"  [dim]Standard ports ({all_std}):[/]  "
-        f"[dim]{' · '.join(std_nums[:6])}[/]"
-    )
-    console.print()
+        console.print(
+            f"  [dim]Standard ports ({all_std}):[/]  "
+            f"[dim]{' · '.join(std_nums[:6])}[/]"
+        )
+        console.print()
 
     # HTTP services — admin / login flags only
     if http:
