@@ -203,7 +203,11 @@ def tag_subdomain(name):
     """categorizes subdomain — returns (tag, color, priority)"""
     n = name.lower()
     if any(x in n for x in ["admin","panel","manage","dashboard","cms","cpanel"]):
-        return "Admin",         "red",     3
+    # exclude known email security subdomains that contain "manage"
+    if any(skip in n for skip in ["mta-sts","managed.","management-mail"]):
+        pass  # fall through to other checks
+    else:
+        return "Admin", "red", 3
     if any(x in n for x in ["api","graphql","rest","gateway","ws","grpc"]):
         return "API",           "yellow",  3
     if any(x in n for x in ["dev","debug","test","sandbox","local"]):
