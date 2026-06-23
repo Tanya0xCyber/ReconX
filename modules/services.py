@@ -450,13 +450,12 @@ def probe_http_service(host, port, config):
             # ── security headers check ─────────────────────────────────────
             # check which security headers are present or missing
             security_headers = {
-                "Strict-Transport-Security": "HSTS",
-                "Content-Security-Policy":   "CSP",
-                "X-Frame-Options":           "Clickjacking protection",
-                "X-Content-Type-Options":    "MIME sniffing protection",
-                "Referrer-Policy":           "Referrer policy",
+            "Strict-Transport-Security": "HSTS",
+            "Content-Security-Policy":   "CSP",
+            "X-Frame-Options":           "Clickjacking protection",
+            "X-Content-Type-Options":    "MIME sniffing protection",
+            # Referrer-Policy removed — appears everywhere, low value
             }
-
             present  = {}
             missing  = []
 
