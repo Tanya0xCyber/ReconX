@@ -257,7 +257,82 @@ def run_dns_records(domain, config):
 
     return results
 
+def check_spf_dmarc(domain, config):
+    """
+    explicitly checks SPF and DMARC via direct DNS lookup.
+    high confidence = lookup succeeded, result is trustworthy.
+    low confidence  = DNS timed out, don't report as missing.
+    """
 
+    result = {
+        "spf":   {"present": False, "confidence": "low", "value": ""},
+        "dmarc": {"present": False, "confidence": "low", "value": ""},
+    }
+
+    timeout = config.get("timeout", 5)
+
+    # check SPF
+    try:
+        if DNS_LIB:
+            resolver = dns.resolver.Resolver()
+            resolver.timeout  = timeout
+            resolver.lifetime = timeout
+            try:
+                answers = resolver.resolve(domain, "TXT")
+                spf_found = False
+                for rdata in answers:
+                    txt = str(rdata).strip('"')
+                    if txt.startswith("v=spf1"):
+                        spf_found = True
+                        result["spf"]["value"] = txt[:80]
+                        break
+                result["spf"]["present"]    = spf_found
+                result["spf"]["confidence"] = "high"
+            except dns.resolver.NXDOMAIN:
+                result["spf"]["present"]    = False
+                result["spf"]["confidence"] = "high"
+            except dns.resolver.NoAnswer:
+                result["spf"]["present"]    = False
+                result["spf"]["confidence"] = "high"
+            except dns.resolver.Timeout:
+                result["spf"]["confidence"] = "low"
+            except Exception:
+                result["spf"]["confidence"] = "low"
+    except Exception:
+        result["spf"]["confidence"] = "low"
+
+    # check DMARC — query _dmarc.domain
+    try:
+        dmarc_domain = f"_dmarc.{domain}"
+        if DNS_LIB:
+            resolver = dns.resolver.Resolver()
+            resolver.timeout  = timeout
+            resolver.lifetime = timeout
+            try:
+                answers = resolver.resolve(dmarc_domain, "TXT")
+                dmarc_found = False
+                for rdata in answers:
+                    txt = str(rdata).strip('"')
+                    if txt.startswith("v=DMARC1"):
+                        dmarc_found = True
+                        result["dmarc"]["value"] = txt[:80]
+                        break
+                result["dmarc"]["present"]    = dmarc_found
+                result["dmarc"]["confidence"] = "high"
+            except dns.resolver.NXDOMAIN:
+                result["dmarc"]["present"]    = False
+                result["dmarc"]["confidence"] = "high"
+            except dns.resolver.NoAnswer:
+                result["dmarc"]["present"]    = False
+                result["dmarc"]["confidence"] = "high"
+            except dns.resolver.Timeout:
+                result["dmarc"]["confidence"] = "low"
+            except Exception:
+                result["dmarc"]["confidence"] = "low"
+    except Exception:
+        result["dmarc"]["confidence"] = "low"
+
+    return result
 # ══════════════════════════════════════════════════════
 #  SECTION 3 — GEO + ASN INFO
 # ══════════════════════════════════════════════════════
