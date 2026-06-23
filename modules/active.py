@@ -64,7 +64,7 @@ SECRET_PATTERNS = {
     "Generic Secret":   r"(?i)(secret|password)\s*[:=]\s*['\"]([^'\"]{8,})['\"]",
     "Bearer Token":     r"(?i)bearer\s+([a-zA-Z0-9_\-\.]{20,})",
     "MongoDB URI":      r"mongodb(\+srv)?://[^\s\"']{10,}",
-    "Internal IP":      r"(?:10|172\.(?:1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}",
+    "Internal IP":      r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b"
     "NPM Token":        r"npm_[A-Za-z0-9]{36}",
     "Mapbox Token":     r"pk\.[a-zA-Z0-9]{60,}",
 }
