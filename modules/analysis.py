@@ -1334,25 +1334,42 @@ def run_analysis(results, config):
         base_url = f"https://{domain}" if domain else ""
 
     # ── 1. WAF detection ──────────────────────────────────────────────────
+    # ── 1. WAF detection ──────────────────────────────────────────────────
     if base_url:
-        if config.get("verbose"):
-            print("    running WAF detection...")
-
         waf_results = run_waf_detection(base_url, config)
         analysis_results["waf"]            = waf_results.get("waf", [])
+        analysis_results["cdn"]            = waf_results.get("cdn", [])
         analysis_results["waf_detected"]   = waf_results.get("waf_detected", False)
         analysis_results["bypass_headers"] = waf_results.get("bypass_headers", {})
 
     # ── 2. tech fingerprinting ────────────────────────────────────────────
+    # ── 2. tech fingerprinting ────────────────────────────────────────────
     if base_url:
-        if config.get("verbose"):
-            print("    running tech fingerprinting...")
-
         tech = run_tech_fingerprint(base_url, config)
         analysis_results["tech_stack"] = tech
-
-        # merge into main results so vuln hints can see it
         results["tech_stack"] = tech
+
+        # sync tech -> cdn
+        # if tech fingerprinting found a CDN that WAF detection missed
+       
+        cdn_list = list(analysis_results.get("cdn", []))
+
+        cdn_from_tech = {
+           "Cloudflare":       "Cloudflare",
+           "Cloudflare Pages": "Cloudflare",
+           "Fastly":           "Fastly",
+           "AWS CloudFront":   "AWS CloudFront",
+           "Vercel":           "Vercel",
+           "Netlify":          "Netlify",
+        }
+
+        for tech_name, cdn_name in cdn_from_tech.items():
+            if tech_name in tech and cdn_name not in cdn_list:
+                cdn_list.append(cdn_name)
+
+        analysis_results["cdn"] = cdn_list
+        # note: do NOT auto-add to waf list
+        # WAF must be confirmed by WAF detection only
 
     # ── 3. vulnerability hints ────────────────────────────────────────────
     if config.get("verbose"):
