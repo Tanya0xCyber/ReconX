@@ -122,11 +122,7 @@ CDN_SIGNATURES = {
         "headers": ["x-check-cacheable","akamai-origin-hop"],
         "server":  [],
     },
-    "Varnish": {
-        "headers": ["x-varnish","via"],
-        "server":  [],
-        "header_values": ["varnish"],
-    },
+   
 }
 # headers we send to try to bypass WAF
 # we pretend to be an internal/trusted IP
@@ -339,11 +335,15 @@ VULN_HINT_RULES = [
         "id":       "JS-002",
         "title":    "API keys / tokens exposed in JS files",
         "severity": "High",
-        "detail":   (
-            "API keys or tokens found in client-side JavaScript. "
-            "These may allow unauthorized access to third-party services."
-        ),
-        "check": lambda r: len(r.get("js_secrets", [])) > 0,
+        "detail":   "API keys or tokens found in client-side JavaScript.",
+        # only fire for REAL secrets — not generic refs or internal IPs
+        # this matches what the display shows to avoid contradictions
+       "check": lambda r: len([
+           s for s in r.get("js_secrets", [])
+           if "Internal IP" not in s.get("type","")
+           and s.get("type","") not in ["Generic API Key","Generic Secret"]
+           and "Internal" not in s.get("type","")
+           ]) > 0,
     },
 
     # ── subdomain takeover ────────────────────────────────────────────────
