@@ -383,28 +383,22 @@ def print_passive_results(results):
 
         console.print()
 
-        # only show result when confidence is high
-        # low confidence = DNS timed out = we don't actually know
         if spf_conf == "high":
-            spf_str = (
+           spf_str = (
                "[bright_green]present[/]"
                if spf_present else
-              "[red]missing[/]  [dim]-> spoofable[/]"
-        )
-        else:
-            spf_str = "[dim]unknown (lookup failed)[/]"
+               "[red]missing[/]  [dim]-> spoofable[/]"
+           )
+           console.print(f"  [dim]SPF  [/]   {spf_str}")
 
         if dmarc_conf == "high":
-             dmarc_str = (
-                "[bright_green]present[/]"
+           dmarc_str = (
+               "[bright_green]present[/]"
                 if dmarc_present else
                 "[red]missing[/]  [dim]-> domain spoofable[/]"
-         )
-        else:
-            dmarc_str = "[dim]unknown (lookup failed)[/]"
-
-        console.print(f"  [dim]SPF  [/]   {spf_str}")
-        console.print(f"  [dim]DMARC[/]   {dmarc_str}")
+            )
+            console.print(f"  [dim]DMARC[/]   {dmarc_str}")
+        # if both unknown — show nothing, not wrong info
 
     # Geo
     geo = results.get("geo_asn", {})
@@ -415,12 +409,12 @@ def print_passive_results(results):
         console.print(
             f"  [dim]ISP[/]     [white]{isp}[/]  [dim]{asn}[/]"
         )
-        if hosting:
+        cdn_detected = results.get("cdn", [])
+        if hosting and cdn_detected:
             console.print(
-                "  [yellow]CDN/Proxy[/]  [dim]→ real IP hidden  "
-                "check: cert history, SPF includes, email headers[/]"
-            )
-        console.print()
+            "  [dim]CDN/Proxy  -> real IP hidden  "
+            "check: cert history, SPF includes, email headers[/]"
+        )
 
     # crt.sh — high-value subs only
     crt  = results.get("crtsh", {})
@@ -800,20 +794,25 @@ def print_services_results(results):
     # standard — just count
     all_std = len(std_ports) + len([p for p in web_ports
                                     if p[0].get("port","") in {80,443}])
+    # REPLACE WITH:
     if all_std:
-        # collect the actual port numbers for display
-        std_nums = []
-        for p in std_ports:
-           std_nums.append(str(p.get("port","")))
-        for p, label, opp in web_ports:
-           if p.get("port","") in {80, 443}:
-               std_nums.append(str(p.get("port","")))
+       std_nums = []
+       seen_ports = set()
+       for p in std_ports:
+           num = str(p.get("port",""))
+           if num not in seen_ports:
+               seen_ports.add(num)
+               std_nums.append(num)
+       for p, label, opp in web_ports:
+           num = str(p.get("port",""))
+           if p.get("port","") in {80,443} and num not in seen_ports:
+              seen_ports.add(num)
+              std_nums.append(num)
 
-        console.print(
-            f"  [dim]Standard ports ({all_std}):[/]  "
-            f"[dim]{' · '.join(std_nums[:6])}[/]"
-        )
-        console.print()
+       console.print(
+           f"  [dim]Standard ports:[/]  "
+           f"[dim]{' · '.join(sorted(std_nums, key=lambda x: int(x) if x.isdigit() else 0))}[/]"
+       )
 
     # HTTP services — admin / login flags only
     if http:
@@ -1229,8 +1228,7 @@ def print_executive_summary(results, config, elapsed):
                                   "jQuery","Bootstrap"],
               "CMS":        ["WordPress","Drupal","Joomla","Magento",
                                    "Shopify","Wix","Squarespace","WooCommerce"],
-              "CDN / Host": ["Cloudflare Pages","AWS CloudFront","Fastly",
-                                "Vercel","Netlify","GitHub Pages","Cloudflare"],
+             
         }
 
         tech_attack = {
