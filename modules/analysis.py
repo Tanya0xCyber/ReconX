@@ -842,7 +842,7 @@ def run_tech_fingerprint(base_url, config):
                     (3, headers_lower.get("x-drupal-cache","") != ""),
                     (2, "drupal" in body_lower),
                 ],
-                "min_score": 3,  # needs strong signal
+                "min_score": 4,  # increase from 3 to 4 — "drupal" in body alone is not enough
             },
             "Joomla": {
                 "checks": [
