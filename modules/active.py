@@ -16,7 +16,7 @@ import socket                # DNS resolution fallback
 import random                # random user agents
 from urllib.parse import urljoin, urlparse   # URL manipulation
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+import ipaddress                         
 import requests
 requests.packages.urllib3.disable_warnings()
 
@@ -68,23 +68,7 @@ SECRET_PATTERNS = {
     "NPM Token":        r"npm_[A-Za-z0-9]{36}",
     "Mapbox Token":     r"pk\.[a-zA-Z0-9]{60,}",
 }
-# After extracting internal IPs, validate each one:
-import ipaddress
 
-def is_valid_private_ip(ip_str):
-    """validate that extracted string is actually a private IP"""
-    try:
-        ip = ipaddress.ip_address(ip_str)
-        return ip.is_private and not ip.is_loopback
-    except ValueError:
-        return False
-
-# filter secrets list after extraction:
-secrets = [
-    s for s in secrets
-    if s.get("type") != "Internal IP"
-    or is_valid_private_ip(s.get("value","").strip())
-]
 # ── API endpoint patterns ──────────────────────────────────────────────────
 # regex to find API paths inside JS files
 # e.g. fetch("/api/v1/users") or axios.get('/api/auth/login')
@@ -282,7 +266,14 @@ def http_probe_subdomain(entry, config):
     entry["http"] = False
     return entry
 
-
+def is_valid_private_ip(ip_str):
+    """validate that extracted string is actually a private IP"""
+    try:
+        ip = ipaddress.ip_address(ip_str.strip())
+        return ip.is_private and not ip.is_loopback
+    except ValueError:
+        return False
+        
 def check_subdomain_takeover(entry):
     """
     Checks if a subdomain is vulnerable to takeover.
@@ -524,7 +515,15 @@ def scan_js_file(js_url, config):
                 "value": value,
                 "file":  js_url,
             })
-
+    validated_secrets = []
+    for s in findings["secrets"]:
+        if s.get("type") == "Internal IP":
+            if is_valid_private_ip(s.get("value", "")):
+                validated_secrets.append(s)
+        else:
+            validated_secrets.append(s)
+    findings["secrets"] = validated_secrets 
+    
     # ── extract API endpoints ──────────────────────────────────────────────
     endpoints_found = set()
     for pattern in ENDPOINT_PATTERNS:
