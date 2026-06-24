@@ -683,7 +683,18 @@ def run_email_harvest(base_url, domain, config):
         "security_contacts": categorized["security"],
     }
 
-
+def filter_endpoints(endpoints, results):
+    tech = results.get("tech_stack", [])
+    filtered = []
+    for ep in endpoints:
+        ep_lower = ep.lower()
+        # wp-admin endpoints only relevant if WordPress detected
+        if any(x in ep_lower for x in ["wp-admin","wp-login","xmlrpc","wp-content"]):
+            if "WordPress" not in tech:
+                continue  # skip — WordPress not detected on this target
+        filtered.append(ep)
+    return filtered
+    
 # ══════════════════════════════════════════════════════
 #  MAIN FUNCTION — called by reconx.py
 # ══════════════════════════════════════════════════════
@@ -741,10 +752,12 @@ def run_active_recon(domain, wordlist_path, config):
     js_results = run_js_scan(base_url, config)
     results["js_scan"] = js_results
 
-    # surface secrets + endpoints at top level
-    results["js_secrets"]   = js_results.get("secrets", [])
-    results["js_endpoints"] = js_results.get("js_endpoints", [])
+    results["js_secrets"] = js_results.get("secrets", [])
 
+    endpoints = js_results.get("js_endpoints", [])
+    endpoints = filter_endpoints(endpoints, results)
+
+    results["js_endpoints"] = endpoints
     # ── 3. Email harvesting ───────────────────────────────────────────────
     if config.get("verbose"):
         print("    running email harvest...")
