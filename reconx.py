@@ -1640,7 +1640,7 @@ def main():
         print_attack_surface(results)
         print_tech_fingerprinting(results)
         print_findings(results)
-       print_next_tests(results, config)
+        print_next_tests(results, config)
 
     # single footer line
     console.print(
