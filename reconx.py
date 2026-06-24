@@ -538,9 +538,7 @@ def print_executive_summary(results, config, elapsed):
         )
         console.print()
 
-    console.print(
-        f"  [dim]── raw recon data below  ·  {round(elapsed,1)}s ──[/]"
-    )
+    
     console.print()
 
 
