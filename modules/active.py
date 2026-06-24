@@ -64,11 +64,27 @@ SECRET_PATTERNS = {
     "Generic Secret":   r"(?i)(secret|password)\s*[:=]\s*['\"]([^'\"]{8,})['\"]",
     "Bearer Token":     r"(?i)bearer\s+([a-zA-Z0-9_\-\.]{20,})",
     "MongoDB URI":      r"mongodb(\+srv)?://[^\s\"']{10,}",
-    "Internal IP":      r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b",
+    "Internal IP":       r"\b(10\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)|172\.(?:1[6-9]|2[0-9]|3[01])\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)|192\.168\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d)\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]\d|\d))\b",
     "NPM Token":        r"npm_[A-Za-z0-9]{36}",
     "Mapbox Token":     r"pk\.[a-zA-Z0-9]{60,}",
 }
+# After extracting internal IPs, validate each one:
+import ipaddress
 
+def is_valid_private_ip(ip_str):
+    """validate that extracted string is actually a private IP"""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_private and not ip.is_loopback
+    except ValueError:
+        return False
+
+# filter secrets list after extraction:
+secrets = [
+    s for s in secrets
+    if s.get("type") != "Internal IP"
+    or is_valid_private_ip(s.get("value","").strip())
+]
 # ── API endpoint patterns ──────────────────────────────────────────────────
 # regex to find API paths inside JS files
 # e.g. fetch("/api/v1/users") or axios.get('/api/auth/login')
