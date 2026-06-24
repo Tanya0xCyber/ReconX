@@ -1144,12 +1144,15 @@ def print_executive_summary(results, config, elapsed):
             or real_secrets or sens_ports):
         risk     = "HIGH"
         risk_clr = "red"
-    elif sev("High") > 0 or sev("Medium") >= 3:
+    elif sev("High") > 0 or sev("Medium") >= 3 and not all(
+        "header" in h.get("title","").lower() or "expires" in h.get("title","").lower()
+        for h in hints if h.get("severity") == "Medium"):
         risk     = "MEDIUM"
         risk_clr = "yellow"
     else:
         risk     = "LOW"
         risk_clr = "bright_green"
+    
 
     console.print(
         f"  [dim]Risk[/]      "
