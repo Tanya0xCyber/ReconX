@@ -504,31 +504,29 @@ def print_active_results(results):
         )
         console.print()
 
+        # In print_active_results(), update the critical display:
         if critical:
-            for s, tag, color, _ in critical[:10]:
-                name   = s.get("subdomain","")
-                status = s.get("status","—")
-                title  = (s.get("title") or "")[:30]
+           for s, tag, color, _ in critical[:10]:
+              name   = s.get("subdomain","")
+              status = s.get("status","—")
+              title  = (s.get("title") or "")[:30]
 
-                st = (
-                    f"[bright_green]{status}[/]" if status == 200
-                    else f"[yellow]{status}[/]"
-                    if str(status).startswith("3")
-                    else f"[red]{status}[/]"
-                    if status in [401,403]
-                    else f"[dim]{status}[/]"
-                )
-                console.print(
-                    f"  [red]>[/]  [bold white]{name}[/]  "
-                    f"{st}  [{color}][{tag}][/{color}]"
-                    + (f"  [dim]{title}[/]" if title else "")
-                )
+              # 404 = not found, don't highlight as critical entry point
+              if status == 404:
+              color = "dim"
 
-            if len(critical) > 10:
-                console.print(
-                    f"  [dim]  + {len(critical)-10} more critical[/]"
-                )
-            console.print()
+              st = (
+                  f"[bright_green]{status}[/]" if status == 200
+                  else f"[yellow]{status}[/]" if str(status).startswith("3")
+                  else f"[red]{status}[/]"    if status in [401,403]
+                  else f"[dim]{status}[/]"
+              )
+              console.print(
+                  f"  [{'dim' if status == 404 else color}]>[/]  "
+                  f"[{'dim' if status == 404 else 'bold white'}]{name}[/]  "
+                  f"{st}  [{color}][{tag}][/{color}]"
+                  + (f"  [dim]{title}[/]" if title else "")
+              )
 
         if medium:
             for s, tag, color, _ in medium[:5]:
@@ -1280,12 +1278,16 @@ def print_executive_summary(results, config, elapsed):
                     f"[dim]-> {vec}[/]"
                 )
 
+        cdn_tech = {
+            "Cloudflare","Cloudflare Pages","Fastly",
+            "AWS CloudFront","Vercel","Netlify",
+            "GitHub Pages","Akamai CDN"
+        }
         for t in tech:
-            if t not in shown:
+            if t not in shown and t not in cdn_tech:
                 console.print(
                     f"  [dim]{'Other':<12}[/]  [white]{t}[/]"
                 )
-
     console.print()
 
     # ── recommended testing focus ──────────────────────
