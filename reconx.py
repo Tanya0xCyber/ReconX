@@ -296,262 +296,762 @@ def print_section_rule(title):
     )
     console.print()
 
-def print_passive_results(results):
-    """passive recon — signal only, no edu text"""
+# ══════════════════════════════════════════════════════
+#  SECTION 1 — EXECUTIVE SUMMARY
+#  Risk + Top Findings + Recommended Testing Focus
+# ══════════════════════════════════════════════════════
 
-    section("01 · Passive Recon")
+def print_executive_summary(results, config, elapsed):
 
-    # WHOIS
-    whois = results.get("whois", {})
+    section("Executive Summary")
+
+    hints      = results.get("vuln_hints", [])
+    secrets    = results.get("js_secrets", [])
+    takeovers  = results.get("takeovers", [])
+    ports      = results.get("open_ports", [])
+    http       = results.get("http_services", [])
+
+    def sev(s):
+        return sum(1 for h in hints if h.get("severity") == s)
+
+    real_secrets = [
+        s for s in secrets
+        if "Internal IP" not in s.get("type","")
+        and s.get("type","") not in ["Generic API Key","Generic Secret"]
+    ]
+    sens_ports = [
+        p for p in ports
+        if p.get("port") in {2375,6379,27017,9200,6443,2379,23,3389,5900}
+    ]
+
+    # risk — only based on verified findings, never tech detection
+    non_header_medium = sum(
+        1 for h in hints
+        if h.get("severity") == "Medium"
+        and "header" not in h.get("title","").lower()
+        and "expires"  not in h.get("title","").lower()
+        and "clickjack" not in h.get("title","").lower()
+    )
+
+    if sev("Critical") > 0 or takeovers or real_secrets or sens_ports:
+        risk, risk_clr = "HIGH",   "red"
+    elif sev("High") > 0 or non_header_medium >= 2:
+        risk, risk_clr = "MEDIUM", "yellow"
+    else:
+        risk, risk_clr = "LOW",    "bright_green"
+
+    # ── Risk ──────────────────────────────────────────
+    console.print(
+        f"  [dim]Risk[/]      [{risk_clr}]{risk}[/{risk_clr}]  "
+        f"[dim]·  {sev('Critical')} critical  "
+        f"{sev('High')} high  "
+        f"{sev('Medium')} medium  "
+        f"{sev('Low')} low[/]"
+    )
+    console.print()
+
+    # ── Top Findings ──────────────────────────────────
+    if hints:
+        ordered = sorted(
+            hints,
+            key=lambda h: {
+                "Critical":0,"High":1,"Medium":2,"Low":3,"Info":4
+            }.get(h.get("severity","Info"), 5)
+        )
+
+        evidence_map = {
+            "HDR-001": "Strict-Transport-Security absent in response",
+            "HDR-002": "Content-Security-Policy absent in response",
+            "HDR-003": "X-Frame-Options absent in response",
+            "HDR-004": "X-Content-Type-Options absent in response",
+            "DNS-001": "Expiry date within 90 days per WHOIS",
+            "DNS-002": "No SPF TXT record — DNS lookup confirmed",
+            "DNS-003": "_dmarc TXT record absent — DNS lookup confirmed",
+            "JS-001":  "AWS key pattern matched in JS bundle",
+            "JS-002":  "Secret pattern matched in client-side JS",
+            "PORT-001":"Port 2375 TCP connect confirmed",
+            "PORT-002":"Port 6379 TCP connect confirmed",
+            "PORT-003":"Port 27017 TCP connect confirmed",
+            "PORT-004":"Port 9200 TCP connect confirmed",
+            "PORT-005":"Port 6443 TCP connect confirmed",
+            "PORT-006":"Port 23 TCP connect confirmed",
+            "PORT-007":"Port 3389 TCP connect confirmed",
+            "ADM-001": "URL path or page title matched admin pattern",
+            "SUB-001": "CNAME points to unclaimed external service",
+            "CVE-001": "CVE IDs returned by Shodan for this IP",
+            "TECH-001":"WordPress path pattern in HTML source",
+            "TECH-002":"__VIEWSTATE field in HTML form",
+        }
+
+        impact_map = {
+            "HDR-001": "SSL stripping possible on local network",
+            "HDR-002": "XSS payloads execute without restriction",
+            "HDR-003": "Page embeddable in iframe — clickjacking",
+            "HDR-004": "MIME-type confusion attacks possible",
+            "DNS-001": "Domain hijackable if registration lapses",
+            "DNS-002": "Anyone can send email as this domain",
+            "DNS-003": "Spoofed email passes inbox delivery checks",
+            "JS-001":  "Direct AWS access — S3, IAM, EC2 enumeration",
+            "JS-002":  "Potential authenticated access via leaked key",
+            "PORT-001":"Mount host filesystem — full server takeover",
+            "PORT-002":"Read/write all data — RCE via SLAVEOF possible",
+            "PORT-003":"Full database read/write without credentials",
+            "PORT-004":"Full Elasticsearch index access",
+            "PORT-005":"Kubernetes cluster control if misconfigured",
+            "PORT-006":"Credentials transmitted in cleartext",
+            "PORT-007":"Brute-force / known exploit entry point",
+            "ADM-001": "Credential attacks on admin interface",
+            "SUB-001": "Attacker can claim subdomain for phishing",
+            "CVE-001": "Known exploits may apply — verify patch status",
+            "TECH-001":"Plugin CVEs and admin panel exposure",
+            "TECH-002":"Deserialization risk if MAC check disabled",
+        }
+
+        confidence_map = {
+            "HDR-001":"High", "HDR-002":"High",
+            "HDR-003":"High", "HDR-004":"High",
+            "DNS-001":"High", "DNS-002":"High", "DNS-003":"High",
+            "JS-001": "High", "JS-002": "Medium",
+            "PORT-001":"High","PORT-002":"High","PORT-003":"High",
+            "PORT-004":"High","PORT-005":"Medium",
+            "PORT-006":"High","PORT-007":"High",
+            "ADM-001":"Medium","SUB-001":"Medium",
+            "CVE-001":"Medium","TECH-001":"High","TECH-002":"High",
+        }
+
+        console.print("  [bold bright_green]Top Findings[/]")
+        console.print()
+
+        for h in ordered[:6]:
+            sev_s = h.get("severity","Info")
+            hid   = h.get("id","")
+            conf  = confidence_map.get(hid,"Medium")
+
+            sev_clr  = {
+                "Critical":"red","High":"yellow",
+                "Medium":"bright_blue","Low":"dim"
+            }.get(sev_s,"dim")
+            conf_clr = {
+                "High":"bright_green","Medium":"yellow","Low":"dim"
+            }.get(conf,"dim")
+
+            console.print(
+                f"  [{sev_clr}][{sev_s}][/{sev_clr}]"
+                f"  [{conf_clr}][{conf} confidence][/{conf_clr}]"
+                f"  [white]{h.get('title','')}[/]"
+            )
+            imp = impact_map.get(hid,"")
+            ev  = evidence_map.get(hid,"automated detection")
+            if imp:
+                console.print(f"  [dim]           Impact:   {imp}[/]")
+            console.print(f"  [dim]           Evidence: {ev}[/]")
+            console.print()
+
+    else:
+        console.print(
+            "  [dim]Top Findings[/]\n"
+            "  [dim]  No confirmed findings from automated scan.[/]"
+        )
+        console.print()
+
+    # ── Recommended Testing Focus ──────────────────────
+    console.print("  [bold bright_green]Recommended Testing Focus[/]")
+    console.print()
+
+    tech      = results.get("tech_stack",[])
+    endpoints = results.get("js_endpoints",[])
+    emails    = results.get("emails",[])
+    cdn       = results.get("cdn",[])
+    waf       = results.get("waf",[])
+    admin_svcs = [s for s in http if s.get("is_admin")]
+    bf        = results.get("subdomain_bruteforce",{})
+    live_subs = bf.get("live",[])
+    has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
+
+    high_f   = []
+    medium_f = []
+    low_f    = []
+
+    # high — only when something concrete found
+    if takeovers:
+        high_f.append("Subdomain takeover — claim service, test cookie scope")
+    if real_secrets:
+        high_f.append("Validate leaked credentials against their services")
+    if sens_ports:
+        port_list = ", ".join(str(p.get("port","")) for p in sens_ports[:2])
+        high_f.append(f"Unauthenticated service access — port(s) {port_list}")
+    if admin_svcs:
+        high_f.append("Admin panel credential testing — default creds / BF")
+    if any(t in tech for t in ["WordPress","Drupal","Magento","Joomla"]):
+        high_f.append("CMS-specific testing — plugin CVEs, admin panel")
+    if any(t in tech for t in ["React","Angular","Vue.js","Next.js"]):
+        high_f.append("API authorization testing — JS app relies on APIs")
+
+    # medium — useful but not urgent
+    if cdn:
+        medium_f.append("Origin IP discovery — cert history, SPF, DNS records")
+    if endpoints:
+        medium_f.append(
+            f"API endpoint testing — {len(endpoints)} path(s) found "
+            f"(IDOR, auth bypass, rate limiting)"
+        )
+    if has_no_dmarc and emails:
+        medium_f.append(
+            f"Email spoofing test — no DMARC, "
+            f"{len(emails)} address(es) available"
+        )
+    if any(t in tech for t in ["Laravel","Django","ASP.NET","Spring Boot","PHP"]):
+        medium_f.append("Framework misconfiguration — debug mode, config exposure")
+    if live_subs:
+        medium_f.append(
+            f"Subdomain access control — {len(live_subs)} live, "
+            f"each may have different auth"
+        )
+
+    # low — worth noting
+    missing_hdrs = [s for s in http if s.get("missing_headers")]
+    if missing_hdrs:
+        low_f.append("Security header review — CSP, HSTS, X-Frame-Options")
+    if waf:
+        low_f.append("WAF bypass testing — header manipulation, encoding")
+
+    if high_f:
+        console.print("  [red]High Priority[/]")
+        for f in high_f[:4]:
+            console.print(f"  [dim]    -  {f}[/]")
+        console.print()
+    if medium_f:
+        console.print("  [yellow]Medium Priority[/]")
+        for f in medium_f[:3]:
+            console.print(f"  [dim]    -  {f}[/]")
+        console.print()
+    if low_f:
+        console.print("  [bright_blue]Low Priority[/]")
+        for f in low_f[:2]:
+            console.print(f"  [dim]    -  {f}[/]")
+        console.print()
+
+    if not high_f and not medium_f:
+        console.print(
+            "  [dim]-  No automated shortcuts found[/]\n"
+            "  [dim]-  Manual testing: auth flows, IDOR, business logic[/]"
+        )
+        console.print()
+
+    console.print(
+        f"  [dim]── raw recon data below  ·  {round(elapsed,1)}s ──[/]"
+    )
+    console.print()
+
+
+# ══════════════════════════════════════════════════════
+#  SECTION 2 — TARGET INFORMATION
+#  Domain, IP, HTTPS, Server, CDN, WAF
+# ══════════════════════════════════════════════════════
+
+def print_target_info(results, config):
+
+    section("Target Information")
+
+    waf = results.get("waf", [])
+    cdn = results.get("cdn", [])
+
+    fields = [
+        ("Domain",  config["target"]),
+        ("IP",      results.get("ip","—")),
+        ("HTTPS",   "Yes" if results.get("https") else "No"),
+        ("Server",  results.get("server","—")),
+    ]
+
+    for k, v in fields:
+        if v and v != "—":
+            console.print(f"  [dim]{k:<10}[/]  [white]{v}[/]")
+
+    # CDN — shown only if detected
+    if cdn:
+        console.print(
+            f"  [dim]{'CDN':<10}[/]  [yellow]{' + '.join(cdn)}[/]  "
+            f"[dim]-> origin IP hidden[/]"
+        )
+    else:
+        console.print(f"  [dim]{'CDN':<10}[/]  [dim]none detected[/]")
+
+    # WAF — shown only if confidently detected
+    if waf:
+        console.print(
+            f"  [dim]{'WAF':<10}[/]  [red]{' + '.join(waf)}[/]  "
+            f"[dim]-> security filtering active[/]"
+        )
+    # if no WAF — say nothing, absence is the default
+
+    console.print()
+
+    # WHOIS — domain registration context
+    whois = results.get("whois",{})
     if whois and not whois.get("error"):
-        fields = [
-            ("Registrar", whois.get("registrar")),
-            ("Created",   whois.get("created")),
-            ("Expires",   whois.get("expires")),
-            ("Org",       whois.get("registrant_org")),
-        ]
-        for k, v in fields:
-            if v and v != "—":
-                console.print(
-                    f"  [dim]{k:<12}[/]  [white]{v}[/]"
-                )
+        console.print("  [dim]Registration[/]")
+        for k, v in [
+            ("Registrar", whois.get("registrar","")),
+            ("Org",       whois.get("registrant_org","")),
+            ("Created",   whois.get("created","")),
+            ("Expires",   whois.get("expires","")),
+        ]:
+            if v:
+                console.print(f"  [dim]  {k:<10}[/]  [white]{v}[/]")
 
-        # expiry flag only
+        # expiry warning
         expires = whois.get("expires","")
         if expires:
             try:
                 from datetime import datetime as dt
-                days = (dt.strptime(expires, "%Y-%m-%d") - dt.now()).days
+                days = (dt.strptime(expires,"%Y-%m-%d") - dt.now()).days
                 if days < 90:
                     console.print(
-                        f"  [red]⚠  Expires in {days}d[/]  "
-                        f"[dim]→ domain hijack risk[/]"
+                        f"\n  [red]!  Expires in {days}d[/]  "
+                        f"[dim]-> domain hijack risk[/]"
                     )
             except Exception:
                 pass
-
-        # NS insight — one line
-        ns = whois.get("name_servers", [])
-        ns_str = " ".join(ns).lower()
-        if ns:
-            ns_hint = ""
-            if "cloudflare" in ns_str:
-                ns_hint = "[dim]→ origin IP hidden — find via cert SANs / SPF[/]"
-            elif "awsdns" in ns_str:
-                ns_hint = "[dim]→ AWS hosted — check for S3 buckets[/]"
-            console.print(
-                f"  [dim]{'NS':<12}[/]  "
-                f"[white]{' · '.join(ns[:2])}[/]  {ns_hint}"
-            )
         console.print()
 
-    # DNS — compact, just the records + one contextual note
-    dns = results.get("dns_records", {})
+    # NS context
+    ns = whois.get("name_servers",[]) if whois else []
+    if ns:
+        ns_str = " ".join(ns).lower()
+        hint   = ""
+        if "cloudflare" in ns_str:
+            hint = "[dim]-> Cloudflare DNS — origin IP hidden[/]"
+        elif "awsdns" in ns_str:
+            hint = "[dim]-> AWS Route53 — check for S3 buckets[/]"
+        console.print(
+            f"  [dim]{'NS':<10}[/]  "
+            f"[white]{' · '.join(ns[:2])}[/]  {hint}"
+        )
+        console.print()
+
+    # DNS records
+    dns = results.get("dns_records",{})
     if dns:
         for rtype in ["A","MX","NS","CNAME"]:
-            records = dns.get(rtype, [])
+            records = dns.get(rtype,[])
             if not records:
                 continue
             vals = []
             for r in records[:2]:
                 if isinstance(r, dict):
-                    vals.append(
-                        f"[{r.get('priority','')}] {r.get('host','')}"
-                    )
+                    vals.append(f"[{r.get('priority','')}] {r.get('host','')}")
                 else:
-                    vals.append(str(r)[:60])
+                    vals.append(str(r)[:55])
             console.print(
                 f"  [bright_green]{rtype:<6}[/]  [white]{' · '.join(vals)}[/]"
             )
 
-        # MX → mail provider in one line
         mx = dns.get("MX",[])
         if mx:
             mx_str = str(mx).lower()
             if "google" in mx_str:
-                console.print("  [dim]       Google Workspace — phishing hits spam filters[/]")
+                console.print("  [dim]         Google Workspace[/]")
             elif "outlook" in mx_str or "microsoft" in mx_str:
-                console.print("  [dim]       M365 — O365 phishing highly effective, check MFA[/]")
-
-        # Email security — compact table
-        # Email security — use explicit DNS lookup results
-        # not the TXT parsing which can miss records
-        email_sec  = results.get("email_security", {})
-        spf_data   = email_sec.get("spf",   {})
-        dmarc_data = email_sec.get("dmarc", {})
-
-        spf_present   = spf_data.get("present", False)
-        spf_conf      = spf_data.get("confidence", "low")
-        dmarc_present = dmarc_data.get("present", False)
-        dmarc_conf    = dmarc_data.get("confidence", "low")
-
+                console.print("  [dim]         Microsoft 365[/]")
         console.print()
 
-        if spf_conf == "high":
-           spf_str = (
-               "[bright_green]present[/]"
-               if spf_present else
-               "[red]missing[/]  [dim]-> spoofable[/]"
-           )
-           console.print(f"  [dim]SPF  [/]   {spf_str}")
+    # email security
+    email_sec  = results.get("email_security",{})
+    spf_data   = email_sec.get("spf",{})
+    dmarc_data = email_sec.get("dmarc",{})
+    spf_conf   = spf_data.get("confidence","low")
+    dmarc_conf = dmarc_data.get("confidence","low")
 
-        if dmarc_conf == "high":
-           dmarc_str = (
-               "[bright_green]present[/]"
-                if dmarc_present else
-                "[red]missing[/]  [dim]-> domain spoofable[/]"
-           )
-           console.print(f"  [dim]DMARC[/]   {dmarc_str}")
-            # if both unknown — show nothing, not wrong info
+    if spf_conf == "high":
+        spf_str = (
+            "[bright_green]present[/]"
+            if spf_data.get("present") else
+            "[red]missing[/]  [dim]-> domain spoofable[/]"
+        )
+        console.print(f"  [dim]{'SPF':<10}[/]   {spf_str}")
 
-    # Geo
-    geo = results.get("geo_asn", {})
+    if dmarc_conf == "high":
+        dmarc_str = (
+            "[bright_green]present[/]"
+            if dmarc_data.get("present") else
+            "[red]missing[/]  [dim]-> spoofed email passes delivery[/]"
+        )
+        console.print(f"  [dim]{'DMARC':<10}[/]   {dmarc_str}")
+
+    # ISP / ASN
+    geo = results.get("geo_asn",{})
     if geo and not geo.get("error"):
-        isp     = geo.get("isp","—")
-        asn     = geo.get("asn","—")
-        hosting = geo.get("hosting", False)
+        console.print()
         console.print(
-            f"  [dim]ISP[/]     [white]{isp}[/]  [dim]{asn}[/]"
-        )
-        cdn_detected = results.get("cdn", [])
-        if hosting and cdn_detected:
-            console.print(
-            "  [dim]CDN/Proxy  -> real IP hidden  "
-            "check: cert history, SPF includes, email headers[/]"
+            f"  [dim]{'ISP':<10}[/]  "
+            f"[white]{geo.get('isp','—')}[/]  "
+            f"[dim]{geo.get('asn','—')}[/]"
         )
 
-    # crt.sh — high-value subs only
-    crt  = results.get("crtsh", {})
-    subs = crt.get("subdomains", [])
+    # crt.sh — high value subs from cert logs
+    crt  = results.get("crtsh",{})
+    subs = crt.get("subdomains",[])
     if subs:
         tagged = [(s, *tag_subdomain(s)) for s in subs]
         hv = [(s,t,c,p) for s,t,c,p in tagged if p >= 2]
+        console.print()
         console.print(
-            f"  [bold bright_green]crt.sh[/]  "
-            f"[white]{len(subs)}[/] [dim]total  ·  "
+            f"  [dim]crt.sh[/]  "
+            f"[white]{len(subs)}[/] [dim]subdomains in cert logs  ·  "
             f"{len(hv)} high-value[/]"
         )
-        console.print()
-        for name, tag, color, _ in hv[:6]:
-            console.print(
-                f"  [{color}]▸[/]  [white]{name}[/]  "
-                f"[{color}][{tag}][/{color}]"
-            )
-        if len(subs) > 6:
-            console.print(
-                f"  [dim]  + {len(subs)-6} more in report[/]"
-            )
-        console.print()
+        if hv:
+            console.print()
+            for name, tag, color, _ in hv[:5]:
+                console.print(
+                    f"  [{color}]>[/{color}]  [white]{name}[/]  "
+                    f"[{color}][{tag}][/{color}]"
+                )
+        if len(subs) > 5:
+            console.print(f"  [dim]  + {len(subs)-5} more in report[/]")
+    console.print()
 
     # Shodan
-    shodan = results.get("shodan", {})
+    shodan = results.get("shodan",{})
     if shodan and not shodan.get("skipped") and not shodan.get("error"):
-        vulns = shodan.get("vulns", [])
-        ports_s = shodan.get("ports", [])
+        vulns   = shodan.get("vulns",[])
+        ports_s = shodan.get("ports",[])
         if vulns:
             console.print(
-                "  [bold red]Shodan CVEs[/]  "
+                "  [red]Shodan CVEs[/]  "
                 + "  ".join(f"[red]{v}[/]" for v in vulns[:4])
             )
         if ports_s:
             console.print(
-                f"  [dim]Shodan ports:[/]  "
+                f"  [dim]Shodan ports[/]  "
                 f"[white]{' · '.join(str(p) for p in ports_s[:8])}[/]"
             )
         console.print()
 
-def print_active_results(results):
-    """active recon — filtered, high-value only"""
 
-    section("02 · Active Recon")
+# ══════════════════════════════════════════════════════
+#  SECTION 3 — ATTACK SURFACE
+#  Subdomains, Ports, APIs, Login/Admin, Endpoints,
+#  Emails
+# ══════════════════════════════════════════════════════
 
-    bf        = results.get("subdomain_bruteforce", {})
-    live      = bf.get("live", [])
-    takeovers = results.get("takeovers", [])
-    secrets   = results.get("js_secrets", [])
-    endpoints = results.get("js_endpoints", [])
-    emails    = results.get("emails", [])
+def print_attack_surface(results):
 
-    # takeovers — always first
-    if takeovers:
-        for t in takeovers:
-            console.print(
-                f"  [bold red]TAKEOVER[/]  "
-                f"[bold white]{t.get('subdomain','')}[/]  "
-                f"[dim]->[/]  [red]{t.get('service','')}[/]  "
-                f"[dim]register account -> own subdomain[/]"
-            )
+    section("Attack Surface")
+
+    bf        = results.get("subdomain_bruteforce",{})
+    live      = bf.get("live",[])
+    takeovers = results.get("takeovers",[])
+    ports     = results.get("open_ports",[])
+    banners   = results.get("banners",[])
+    http      = results.get("http_services",[])
+    endpoints = results.get("js_endpoints",[])
+    emails    = results.get("emails",[])
+
+    # ── Live Subdomains ────────────────────────────────
+    if live or takeovers:
+        console.print("  [bold bright_green]Live Subdomains[/]")
         console.print()
 
-    # subdomains — priority tiers only
-    if live:
-        tagged = []
-        for s in live:
-            name = s.get("subdomain","")
-            tag, color, pri = tag_subdomain(name)
-            tagged.append((s, tag, color, pri))
+        if takeovers:
+            for t in takeovers:
+                console.print(
+                    f"  [red]TAKEOVER[/]  "
+                    f"[bold white]{t.get('subdomain','')}[/]  "
+                    f"[red]{t.get('service','')}[/]  "
+                    f"[dim]unclaimed external service[/]"
+                )
+            console.print()
 
-        critical = [(s,t,c,p) for s,t,c,p in tagged if p == 3]
-        medium   = [(s,t,c,p) for s,t,c,p in tagged if p == 2]
-        standard = [(s,t,c,p) for s,t,c,p in tagged if p <= 1]
+        if live:
+            # split by tag priority — exclude 404
+            tagged = []
+            for s in live:
+                name = s.get("subdomain","")
+                tag, color, pri = tag_subdomain(name)
+                tagged.append((s, tag, color, pri))
 
-        # In the subdomains count line:
-        critical_live = [x for x in critical if x[0].get("status") != 404]
+            critical = [
+                (s,t,c,p) for s,t,c,p in tagged
+                if p == 3 and s.get("status") != 404
+            ]
+            medium = [
+                (s,t,c,p) for s,t,c,p in tagged
+                if p == 2 and s.get("status") != 404
+            ]
+            standard = [
+                (s,t,c,p) for s,t,c,p in tagged
+                if p <= 1 or s.get("status") == 404
+            ]
 
-        console.print(
-            f"  [dim]Subdomains[/]  "
-            f"[white]{len(live)} live[/]  [dim]·[/]  "
-            f"[red]{len(critical_live)} critical[/]  [dim]·[/]  "
-            f"[yellow]{len(medium)} medium[/]  [dim]·[/]  "
-            f"[dim]{len(standard) + (len(critical) - len(critical_live))} standard[/]"
-        )
+            console.print(
+                f"  [dim]Total[/]  "
+                f"[white]{len(live)}[/]  [dim]·[/]  "
+                f"[red]{len(critical)} critical[/]  [dim]·[/]  "
+                f"[yellow]{len(medium)} medium[/]  [dim]·[/]  "
+                f"[dim]{len(standard)} standard[/]"
+            )
+            console.print()
 
-       
+            for s, tag, color, _ in critical[:8]:
+                name   = s.get("subdomain","")
+                status = s.get("status","—")
+                title  = (s.get("title") or "")[:28]
+                st = (
+                    f"[bright_green]{status}[/]" if status == 200
+                    else f"[yellow]{status}[/]" if str(status).startswith("3")
+                    else f"[red]{status}[/]" if status in [401,403]
+                    else f"[dim]{status}[/]"
+                )
+                console.print(
+                    f"  [{color}]>[/{color}]  "
+                    f"[white]{name}[/]  {st}  "
+                    f"[{color}][{tag}][/{color}]"
+                    + (f"  [dim]{title}[/]" if title else "")
+                )
 
-        # In print_active_results(), update the critical display:
-        if critical:
-           for s, tag, color, _ in critical[:10]:
-              name   = s.get("subdomain","")
-              status = s.get("status","—")
-              title  = (s.get("title") or "")[:30]
-
-              # 404 = not found, don't highlight as critical entry point
-              if status == 404:
-                 color = "dim"
-
-              st = (
-                  f"[bright_green]{status}[/]" if status == 200
-                  else f"[yellow]{status}[/]" if str(status).startswith("3")
-                  else f"[red]{status}[/]"    if status in [401,403]
-                  else f"[dim]{status}[/]"
-              )
-              console.print(
-                  f"  [{'dim' if status == 404 else color}]>[/]  "
-                  f"[{'dim' if status == 404 else 'bold white'}]{name}[/]  "
-                  f"{st}  [{color}][{tag}][/{color}]"
-                  + (f"  [dim]{title}[/]" if title else "")
-              )
-        
-
-        if medium:
-            for s, tag, color, _ in medium[:5]:
+            for s, tag, color, _ in medium[:4]:
                 name   = s.get("subdomain","")
                 status = s.get("status","—")
                 console.print(
                     f"  [yellow]·[/]  [white]{name}[/]  "
                     f"[dim]{status}[/]  [{color}][{tag}][/{color}]"
                 )
-            if len(medium) > 5:
-                console.print(f"  [dim]  + {len(medium)-5} more[/]")
-            console.print()
 
-        if standard:
+            if standard:
+                console.print(
+                    f"  [dim]+ {len(standard)} standard in report[/]"
+                )
+        console.print()
+
+    # ── Open Ports ─────────────────────────────────────
+    if ports:
+        console.print("  [bold bright_green]Open Ports[/]")
+        console.print()
+
+        crit_ports = []
+        high_ports = []
+        web_ports  = []
+        std_ports  = []
+
+        for p in ports:
+            num = p.get("port","")
+            label, risk, opp = port_intel(num)
+            if risk == "crit":
+                crit_ports.append((p, label, opp))
+            elif risk == "high":
+                high_ports.append((p, label, opp))
+            elif num in {80,443,8080,8443,8000,8888,3000}:
+                web_ports.append((p, label or p.get("service",""), opp))
+            else:
+                std_ports.append(p)
+
+        if crit_ports:
+            for p, label, opp in crit_ports:
+                host = p.get("host","")
+                num  = p.get("port","")
+                b = next(
+                    (x for x in banners
+                     if x.get("port")==num and x.get("host")==host),
+                    None
+                )
+                ver = f"  [dim]{b['version']}[/]" if b and b.get("version") else ""
+                console.print(
+                    f"  [red]>[/]  [white]{host}:{num}[/]  "
+                    f"[red]{label}[/]{ver}  "
+                    f"[dim]{opp}[/]"
+                )
+
+        if high_ports:
+            for p, label, opp in high_ports[:5]:
+                console.print(
+                    f"  [yellow]>[/]  "
+                    f"[white]{p.get('host','')}:{p.get('port','')}[/]  "
+                    f"[yellow]{label}[/]  [dim]{opp}[/]"
+                )
+
+        # uncommon web ports
+        unusual = [p for p in web_ports if p[0].get("port","") not in {80,443}]
+        if unusual:
+            console.print()
+            console.print("  [bright_blue]Uncommon web ports:[/]")
+            for p, label, opp in unusual[:4]:
+                console.print(
+                    f"  [bright_blue]·[/]  "
+                    f"[white]{p[0].get('host','')}:{p[0].get('port','')}[/]  "
+                    f"[dim]{label}[/]"
+                )
+
+        # standard — just the count and port numbers
+        std_nums = sorted(set(
+            str(p[0].get("port","")) for p in web_ports
+            if p[0].get("port","") in {80,443}
+        ) | set(
+            str(p.get("port","")) for p in std_ports
+        ), key=lambda x: int(x) if x.isdigit() else 0)
+
+        if std_nums:
             console.print(
-                f"  [dim]+ {len(standard)} standard in report[/]"
+                f"\n  [dim]Standard:  {' · '.join(std_nums)}[/]"
             )
+        console.print()
+
+    # ── APIs ──────────────────────────────────────────
+    api_subs = [
+        s for s in (
+            results.get("subdomain_bruteforce",{}).get("live",[])
+        )
+        if "api" in s.get("subdomain","").lower()
+        and s.get("status") != 404
+    ]
+
+    api_endpoints = [
+        e for e in endpoints
+        if "/api/" in e.lower() or e.lower().startswith("/v")
+    ]
+
+    if api_subs or api_endpoints:
+        console.print("  [bold bright_green]APIs[/]")
+        console.print()
+
+        for s in api_subs[:4]:
+            name   = s.get("subdomain","")
+            status = s.get("status","—")
+            title  = (s.get("title") or "")[:30]
+            console.print(
+                f"  [yellow]>[/]  [white]{name}[/]  "
+                f"[dim]{status}[/]"
+                + (f"  [dim]{title}[/]" if title else "")
+            )
+
+        if api_endpoints:
+            for e in api_endpoints[:5]:
+                console.print(
+                    f"  [dim]·  {e}[/]"
+                )
+
+        console.print()
+
+    # ── Login Pages ────────────────────────────────────
+    login_pages = [
+        s for s in http
+        if s.get("is_login") and not s.get("is_admin")
+    ]
+    if login_pages:
+        console.print("  [bold bright_green]Login Pages[/]")
+        console.print()
+        for s in login_pages[:4]:
+            console.print(
+                f"  [yellow]>[/]  [white]{s.get('url','')}[/]  "
+                f"[dim]{s.get('status','')}[/]"
+            )
+        console.print()
+
+    # ── Admin Pages ────────────────────────────────────
+    admin_pages = [s for s in http if s.get("is_admin")]
+    if admin_pages:
+        console.print("  [bold bright_green]Admin Pages[/]")
+        console.print()
+        for s in admin_pages[:4]:
+            console.print(
+                f"  [red]>[/]  [white]{s.get('url','')}[/]  "
+                f"[dim]{s.get('status','')}[/]"
+            )
+        console.print()
+
+    # ── Sensitive Endpoints ────────────────────────────
+    def endpoint_label(path):
+        p = path.lower()
+        if "wp-admin" in p or "wp-login" in p:
+            return "WordPress admin path"
+        if "xmlrpc" in p:
+            return "WordPress XMLRPC"
+        if "admin-ajax" in p:
+            return "WordPress AJAX"
+        if "config" in p:
+            return "Config endpoint"
+        if "debug" in p or "trace" in p:
+            return "Debug endpoint"
+        if "backup" in p or ".bak" in p:
+            return "Backup file"
+        if "internal" in p:
+            return "Internal endpoint"
+        if "secret" in p or "key" in p:
+            return "Secret/key path"
+        return "Sensitive path"
+
+    sens_eps = [
+        e for e in endpoints
+        if any(x in e.lower()
+               for x in ["admin","config","debug","internal",
+                          "secret","backup","root","xmlrpc"])
+    ]
+    auth_eps = [
+        e for e in endpoints
+        if any(x in e.lower()
+               for x in ["auth","login","token","oauth",
+                          "password","reset","register"])
+        and e not in sens_eps
+    ]
+    other_eps = [
+        e for e in endpoints
+        if e not in sens_eps and e not in auth_eps
+        and "/api/" not in e.lower()
+        and not e.lower().startswith("/v")
+    ]
+
+    if sens_eps or auth_eps:
+        console.print("  [bold bright_green]Sensitive Endpoints[/]")
+        console.print()
+        for e in sens_eps[:4]:
+            console.print(
+                f"  [red]>[/]  [white]{e}[/]  "
+                f"[dim]{endpoint_label(e)}[/]"
+            )
+        for e in auth_eps[:3]:
+            console.print(
+                f"  [yellow]>[/]  [white]{e}[/]  "
+                f"[dim]auth endpoint[/]"
+            )
+        if other_eps:
+            console.print(
+                f"  [dim]+ {len(other_eps)} general in report[/]"
+            )
+        console.print()
+
+    # ── Missing Security Headers (attack surface context) ──
+    if http:
+        from collections import Counter
+        all_missing = []
+        for s in http:
+            all_missing.extend(s.get("missing_headers",[]))
+        # exclude Referrer-Policy — low value
+        all_missing = [h for h in all_missing if h != "Referrer-Policy"]
+
+        if all_missing:
+            common = Counter(all_missing).most_common(3)
+            header_explain = {
+                "Strict-Transport-Security":
+                    "HSTS missing — browser may downgrade to HTTP",
+                "Content-Security-Policy":
+                    "CSP missing  — XSS payloads execute unrestricted",
+                "X-Frame-Options":
+                    "XFO missing  — page embeddable in iframe",
+                "X-Content-Type-Options":
+                    "XCTO missing — MIME sniffing possible",
+            }
+            console.print("  [bold bright_green]Missing Security Headers[/]")
+            console.print()
+            for hdr, count in common:
+                explain = header_explain.get(hdr, f"{hdr} missing")
+                console.print(
+                    f"  [bright_blue]·[/]  [white]{explain}[/]  "
+                    f"[dim]({count} service(s))[/]"
+                )
             console.print()
 
-    # JS findings — properly categorized
+    # ── JS Findings ────────────────────────────────────
+    secrets = results.get("js_secrets",[])
     if secrets:
         real_secrets = [
             s for s in secrets
@@ -572,31 +1072,31 @@ def print_active_results(results):
         console.print(
             f"  [dim]  Credentials / Keys[/]  "
             + (f"[red]{len(real_secrets)}[/]"
-               if real_secrets else f"[dim]{len(real_secrets)}[/]")
+               if real_secrets else f"[dim]0[/]")
         )
         console.print(
             f"  [dim]  Generic references[/]  "
             + (f"[yellow]{len(generic)}[/]"
-               if generic else f"[dim]{len(generic)}[/]")
+               if generic else f"[dim]0[/]")
         )
         console.print(
             f"  [dim]  Internal IPs      [/]  "
             f"[bright_blue]{len(internal_ips)}[/]"
-            + ("  [dim](infra hints, not secrets)[/]"
+            + ("  [dim](infra references, not secrets)[/]"
                if internal_ips else "")
         )
         console.print()
 
         secret_use = {
-            "AWS":      "-> aws cli s3 ls / iam enumerate",
-            "GitHub":   "-> clone private repos",
-            "Stripe":   "-> charge cards / read customer PII",
-            "Firebase": "-> read/write DB if rules permissive",
-            "JWT":      "-> decode -> alg confusion -> forge",
-            "Slack":    "-> read messages / post as bot",
+            "AWS":      "aws cli enumeration",
+            "GitHub":   "private repo access",
+            "Stripe":   "payment data access",
+            "Firebase": "database read/write",
+            "JWT":      "token forge / alg confusion",
+            "Slack":    "message access",
         }
 
-        for s in real_secrets[:6]:
+        for s in real_secrets[:5]:
             stype  = s.get("type","")
             val    = s.get("value","")
             masked = val[:6]+"••" if len(val)>6 else val
@@ -604,898 +1104,445 @@ def print_active_results(results):
             use    = next(
                 (u for k,u in secret_use.items()
                  if k.lower() in stype.lower()),
-                "-> test against discovered endpoints"
+                "test against discovered endpoints"
             )
             console.print(
                 f"  [red]>[/]  [white]{stype}[/]  "
-                f"[red]{masked}[/]  [dim]{use}[/]"
+                f"[red]{masked}[/]  [dim]-> {use}[/]"
             )
             if file:
                 console.print(f"  [dim]     {file}[/]")
 
         if internal_ips:
             console.print()
-            console.print("  [bright_blue]Internal IPs:[/]")
             for s in internal_ips[:3]:
                 console.print(
                     f"  [bright_blue]>[/]  "
                     f"[white]{s.get('value','')[:40]}[/]  "
-                    f"[dim]-> internal network reference[/]"
+                    f"[dim]internal network reference[/]"
                 )
-
         console.print()
 
-    else:
-        console.print("  [dim]JS Analysis — no findings[/]")
-        console.print()
-
-    # API endpoints — categorized
-    if endpoints:
-        crit_eps = [
-            e for e in endpoints
-            if any(x in e.lower()
-                   for x in ["admin","config","debug",
-                              "internal","secret","backup","root"])
-        ]
-        auth_eps = [
-            e for e in endpoints
-            if any(x in e.lower()
-                   for x in ["auth","login","token",
-                              "oauth","password","reset","register"])
-        ]
-        other_eps = [
-            e for e in endpoints
-            if e not in crit_eps and e not in auth_eps
-        ]
-
-        console.print(
-            f"  [bold bright_green]Endpoints[/]  "
-            f"[white]{len(endpoints)}[/]  "
-            f"[dim]·[/]  [red]{len(crit_eps)} sensitive[/]  "
-            f"[dim]·[/]  [yellow]{len(auth_eps)} auth[/]"
-        )
-        console.print()
-
-        def endpoint_label(path):
-            """specific label per endpoint type — no generic messages"""
-            p = path.lower()
-            if "wp-admin" in p or "wp-login" in p:
-                return "WordPress admin — test auth controls"
-            if "xmlrpc" in p:
-                return "WordPress XMLRPC — test brute-force / DoS"
-            if "admin-ajax" in p:
-                return "WordPress AJAX — review authorization"
-            if "config" in p:
-                return "Config endpoint — check if auth required"
-            if "debug" in p or "trace" in p:
-                return "Debug endpoint — should not be public"
-            if "backup" in p or ".bak" in p:
-                return "Backup file — check if accessible"
-            if "internal" in p:
-                return "Internal endpoint — verify access controls"
-            if "secret" in p or "key" in p:
-                return "Sensitive path — check response content"
-            return "Sensitive path — review access controls"
-
-        for e in crit_eps[:3]:
-            console.print(
-                f"  [red]>[/]  [white]{e}[/]  "
-                f"[dim]<- {endpoint_label(e)}[/]"
-            )
-
-        for e in auth_eps[:2]:
-            console.print(
-                f"  [yellow]>[/]  [white]{e}[/]  "
-                f"[dim]<- brute-force / token reuse[/]"
-            )
-
-        if other_eps:
-            console.print(
-                f"  [dim]+ {len(other_eps)} general in report[/]"
-            )
-        console.print()
-
-    # emails — one line
+    # ── Emails ─────────────────────────────────────────
     if emails:
         cat       = results.get("email_harvest",{}).get("categorized",{})
         sec_mails = cat.get("security",[])
         console.print(
-            f"  [dim]Emails[/]  [white]{len(emails)} harvested[/]"
-            + (f"  [bright_green]· {len(sec_mails)} security contact(s)[/]"
+            f"  [bold bright_green]Emails Found[/]  "
+            f"[white]{len(emails)}[/]"
+            + (f"  [dim]·  {len(sec_mails)} security contact(s)[/]"
                if sec_mails else "")
         )
-        if sec_mails:
-            for e in sec_mails[:2]:
-                console.print(f"  [dim]  ·[/]  [white]{e}[/]")
+        console.print()
+        for e in (sec_mails or emails)[:4]:
+            console.print(f"  [dim]·  {e}[/]")
         console.print()
 
 
-def print_services_results(results):
-    """service discovery — interesting ports only, mapped to opportunities"""
+# ══════════════════════════════════════════════════════
+#  SECTION 4 — TECHNOLOGY FINGERPRINTING
+#  Web Server, Framework, CMS, Frontend, CDN
+#  Every detection includes Confidence + Evidence
+# ══════════════════════════════════════════════════════
 
-    section("03 · Service Discovery")
+def print_tech_fingerprinting(results):
 
-    ports    = results.get("open_ports", [])
-    banners  = results.get("banners", [])
-    http     = results.get("http_services", [])
+    section("Technology Fingerprinting")
 
-    if not ports:
-        console.print("  [dim]No open ports in scope[/]")
+    tech = results.get("tech_stack",[])
+    cdn  = results.get("cdn",[])
+    waf  = results.get("waf",[])
+
+    if not tech and not cdn and not waf:
+        console.print("  [dim]No technology fingerprints detected.[/]")
         console.print()
         return
 
-    # split by risk level
-    crit_ports = []
-    high_ports = []
-    web_ports  = []
-    std_ports  = []
+    categories = {
+        "Web Server": ["Nginx","Apache","IIS","Litespeed","Tomcat"],
+        "Framework":  ["Laravel","Django","Ruby on Rails","ASP.NET",
+                      "Spring Boot","Symfony","Flask","PHP"],
+        "Frontend":   ["React","Vue.js","Angular","Next.js",
+                      "jQuery","Bootstrap"],
+        "CMS":        ["WordPress","Drupal","Joomla","Magento",
+                      "Shopify","Wix","Squarespace","WooCommerce"],
+    }
 
-    for p in ports:
-        num = p.get("port","")
-        label, risk, opp = port_intel(num)
-        if risk == "crit":
-            crit_ports.append((p, label, opp))
-        elif risk == "high":
-            high_ports.append((p, label, opp))
-        elif num in {80,443,8080,8443,8000,8888,3000}:
-            web_ports.append((p, label or p.get("service",""), opp))
-        else:
-            std_ports.append(p)
+    tech_attack = {
+        "WordPress":   "xmlrpc.php · plugin CVEs · /wp-admin BF",
+        "Drupal":      "Drupalgeddon CVEs · module exploits",
+        "Laravel":     ".env exposure · APP_DEBUG=true",
+        "Django":      "DEBUG mode · /admin BF",
+        "ASP.NET":     "ViewState deser · IIS shortname",
+        "Next.js":     "/_next/data/ unauthed · API route auth",
+        "React":       "secrets in bundle · JWT in localStorage",
+        "Angular":     "env vars in bundle · source maps",
+        "PHP":         "LFI / RFI · type juggling",
+        "Nginx":       "check: alias misconfiguration, proxy headers",
+        "Apache":      "check: directory listing, .htaccess",
+        "IIS":         "check: shortname vuln, WebDAV",
+        "Spring Boot": "/actuator endpoints — info disclosure",
+        "Tomcat":      "manager default creds · PUT method",
+    }
 
-    # critical — full detail
-    if crit_ports:
-        console.print(f"  [bold red]Critical Ports  ({len(crit_ports)})[/]")
-        console.print()
-        for p, label, opp in crit_ports:
-            host = p.get("host","")
-            num  = p.get("port","")
+    tech_evidence = {
+        "Nginx":       ("High",   "Server: nginx in response header"),
+        "Apache":      ("High",   "Server: apache in response header"),
+        "IIS":         ("High",   "Server: microsoft-iis in header"),
+        "Litespeed":   ("High",   "Server: litespeed in header"),
+        "Tomcat":      ("High",   "Server: apache-coyote in header"),
+        "WordPress":   ("High",   "/wp-content/ path in HTML source"),
+        "Drupal":      ("Medium", "x-drupal-cache header or body pattern"),
+        "Joomla":      ("High",   "/components/com_ path in HTML"),
+        "Magento":     ("High",   "mage/cookies or varien in HTML"),
+        "Shopify":     ("High",   "cdn.shopify.com in HTML"),
+        "React":       ("Medium", "data-reactroot or __react in DOM"),
+        "Next.js":     ("High",   "__NEXT_DATA__ in HTML source"),
+        "Angular":     ("High",   "ng-version attribute in HTML"),
+        "Vue.js":      ("Medium", "data-v- or __vue__ in DOM"),
+        "Django":      ("High",   "csrfmiddlewaretoken in HTML form"),
+        "Laravel":     ("High",   "laravel_session cookie present"),
+        "ASP.NET":     ("High",   "__VIEWSTATE field in HTML form"),
+        "PHP":         ("High",   "X-Powered-By: PHP in header"),
+        "Spring Boot": ("High",   "x-application-context header"),
+        "Ruby on Rails":("High",  "x-runtime header present"),
+        "Cloudflare":  ("High",   "cf-ray header in response"),
+        "Fastly":      ("High",   "x-served-by / fastly header"),
+        "AWS CloudFront":("High", "x-amz-cf-id header present"),
+        "Vercel":      ("High",   "x-vercel-id header present"),
+        "Netlify":     ("High",   "x-nf-request-id header present"),
+    }
 
-            # find banner
-            b = next(
-                (x for x in banners
-                 if x.get("port")==num and x.get("host")==host),
-                None
+    cdn_tech_names = {
+        "Cloudflare","Cloudflare Pages","Fastly","AWS CloudFront",
+        "Vercel","Netlify","GitHub Pages","Akamai CDN"
+    }
+
+    shown = set()
+
+    # print by category
+    for cat, members in categories.items():
+        matching = [t for t in tech if t in members]
+        for t in matching:
+            if t in shown:
+                continue
+            shown.add(t)
+            conf, evidence = tech_evidence.get(t, ("Medium","pattern match"))
+            attack  = tech_attack.get(t, "")
+            conf_clr = (
+                "bright_green" if conf == "High"
+                else "yellow"
             )
-            ver = f"  [dim]{b['version']}[/]" if b and b.get("version") else ""
-
             console.print(
-                f"  [red]▸[/]  [bold white]{host}:{num}[/]  "
-                f"[red]{label or p.get('service','')}[/]{ver}"
+                f"  [dim]{cat:<12}[/]  "
+                f"[white]{t}[/]  "
+                f"[{conf_clr}][{conf}][/{conf_clr}]  "
+                f"[dim]{evidence}[/]"
             )
-            if opp:
-                console.print(f"  [dim]     {opp}[/]")
-        console.print()
-
-    # high — compact
-    if high_ports:
-        console.print(f"  [bold yellow]High Risk Ports  ({len(high_ports)})[/]")
-        console.print()
-        for p, label, opp in high_ports[:6]:
-            host = p.get("host","")
-            num  = p.get("port","")
-            console.print(
-                f"  [yellow]▸[/]  [white]{host}:{num}[/]  "
-                f"[yellow]{label or p.get('service','')}[/]  "
-                f"[dim]{opp or ''}[/]"
-            )
-        console.print()
-
-    # web ports — just flag unusual ones
-    unusual_web = [p for p in web_ports
-                   if p[0].get("port","") not in {80,443}]
-    if unusual_web:
-        console.print(
-            f"  [bright_blue]Uncommon Web Ports[/]  "
-            f"[dim](may be less hardened)[/]"
-        )
-        for p, label, opp in unusual_web[:4]:
-            host = p.get("host","")
-            num  = p.get("port","")
-            console.print(
-                f"  [bright_blue]·[/]  [white]{host}:{num}[/]  "
-                f"[dim]{label}[/]"
-                + (f"  [dim]→ {opp}[/]" if opp else "")
-            )
-        console.print()
-
-    # standard — just count
-    all_std = len(std_ports) + len([p for p in web_ports
-                                    if p[0].get("port","") in {80,443}])
-    # REPLACE WITH:
-    if all_std:
-       std_nums = []
-       seen_ports = set()
-       for p in std_ports:
-           num = str(p.get("port",""))
-           if num not in seen_ports:
-               seen_ports.add(num)
-               std_nums.append(num)
-       for p, label, opp in web_ports:
-           num = str(p.get("port",""))
-           if p.get("port","") in {80,443} and num not in seen_ports:
-              seen_ports.add(num)
-              std_nums.append(num)
-
-       console.print(
-           f"  [dim]Standard ports:[/]  "
-           f"[dim]{' · '.join(sorted(std_nums, key=lambda x: int(x) if x.isdigit() else 0))}[/]"
-       )
-
-    # HTTP services — admin / login flags only
-    if http:
-        admin  = [s for s in http if s.get("is_admin")]
-        login  = [s for s in http if s.get("is_login") and not s.get("is_admin")]
-        hdr_g  = [s for s in http if s.get("missing_headers")]
-
-        if admin:
-            console.print("  [red]Admin panels:[/]")
-            for s in admin[:3]:
+            if attack:
                 console.print(
-                    f"  [red]  ▸  {s.get('url','')}[/]  "
-                    f"[dim]{s.get('status','')}  "
-                    f"→ default creds / brute-force[/]"
+                    f"  [dim]             Testing focus: {attack}[/]"
                 )
-            console.print()
 
-        if login:
-            console.print("  [yellow]Login surfaces:[/]")
-            for s in login[:3]:
-                console.print(
-                    f"  [yellow]  ·  {s.get('url','')}[/]  "
-                    f"[dim]{s.get('status','')}[/]"
-                )
-            console.print()
+    # anything not in categories and not CDN
+    for t in tech:
+        if t not in shown and t not in cdn_tech_names:
+            conf, evidence = tech_evidence.get(t, ("Medium","pattern match"))
+            conf_clr = "bright_green" if conf == "High" else "yellow"
+            console.print(
+                f"  [dim]{'Other':<12}[/]  "
+                f"[white]{t}[/]  "
+                f"[{conf_clr}][{conf}][/{conf_clr}]  "
+                f"[dim]{evidence}[/]"
+            )
 
-        # missing headers — explained in plain English
-        from collections import Counter
-        all_missing = []
-        for s in http:
-             all_missing.extend(s.get("missing_headers",[]))
-
-        if all_missing:
-            common = Counter(all_missing).most_common(3)
-
-            header_explain = {
-               "Strict-Transport-Security":
-                  "HSTS missing — browser may downgrade to HTTP",
-               "Content-Security-Policy":
-                  "CSP missing  — XSS payloads execute unrestricted",
-               "X-Frame-Options":
-                  "XFO missing  — page can be embedded in iframe",
-               "X-Content-Type-Options":
-                  "XCTO missing — MIME sniffing attacks possible",
-               
-            }
-            common = Counter([
-                h for h in all_missing
-                if h != "Referrer-Policy"    # skip RP — low value
-            ]).most_common(3)
-
-            console.print("  [bright_blue]Missing security headers:[/]")
-            console.print()
-            for hdr, count in common:
-                 explain = header_explain.get(hdr, f"{hdr} missing")
-                 console.print(
-                     f"  [bright_blue]>[/]  [white]{explain}[/]  "
-                     f"[dim]({count} service(s))[/]"
-                 )
-            console.print()
-
-
-def print_analysis_results(results):
-    """
-    analysis engine — tech + findings already shown
-    in executive summary. this section shows:
-    - attack scenarios (correlations only)
-    - attacker POV (realistic, not scripted)
-    no repetition of what executive summary showed.
-    """
-
-    section("Analysis Engine")
-
-    hints     = results.get("vuln_hints", [])
-    waf       = results.get("waf", [])
-    tech      = results.get("tech_stack", [])
-    endpoints = results.get("js_endpoints", [])
-    secrets   = results.get("js_secrets", [])
-    ports     = results.get("open_ports", [])
-    http      = results.get("http_services", [])
-    emails    = results.get("emails", [])
-    takeovers = results.get("takeovers", [])
-    dns       = results.get("dns_records", {})
-
-    # ── WAF — one line ─────────────────────────────────
-    waf = results.get("waf", [])
-    cdn = results.get("cdn", [])
-
-    if waf:
-       console.print(
-          f"  [dim]WAF[/]  [red]{' + '.join(waf)}[/]  "
-          f"[dim]-> confirmed security filtering[/]"
-       )
+    # CDN/Hosting — shown here under Hosting/CDN category
     if cdn:
-       console.print(
-          f"  [dim]CDN[/]  [yellow]{' + '.join(cdn)}[/]  "
-          f"[dim]-> traffic acceleration, not WAF[/]"
-       )
-    if not waf and not cdn:
-       console.print(
-          "  [dim]WAF / CDN  none detected[/]"
-       )
+        for c in cdn:
+            conf, evidence = tech_evidence.get(c, ("High","header detection"))
+            console.print(
+                f"  [dim]{'CDN / Host':<12}[/]  "
+                f"[yellow]{c}[/]  "
+                f"[bright_green][{conf}][/bright_green]  "
+                f"[dim]{evidence}[/]"
+            )
+
+    # WAF under fingerprinting
+    if waf:
+        for w in waf:
+            console.print(
+                f"  [dim]{'WAF':<12}[/]  "
+                f"[red]{w}[/]  "
+                f"[bright_green][High][/bright_green]  "
+                f"[dim]WAF-specific response headers / block page[/]"
+            )
+
     console.print()
 
-    # ── Tech — mapped to attack direction ──────────────
-   
 
-    # ── Risk findings — compact format ─────────────────
-    has_no_csp   = any("CSP"   in h.get("title","") for h in hints)
-    has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
-    has_no_hsts  = any("HSTS"  in h.get("title","") for h in hints)
-    login_pages  = [s for s in http if s.get("is_login")]
-    sens_ports   = [
-        p for p in ports
-        if p.get("port") in {2375,6379,27017,9200,6443}
-    ]
+# ══════════════════════════════════════════════════════
+#  SECTION 5 — FINDINGS
+#  Full finding list with Severity/Confidence/Impact/Evidence
+#  Only verified findings shown
+# ══════════════════════════════════════════════════════
+
+def print_findings(results):
+
+    section("Findings")
+
+    hints = results.get("vuln_hints",[])
+
+    if not hints:
+        console.print(
+            "  [dim]No confirmed findings from automated scan.[/]\n"
+            "  [dim]Proceed to manual testing.[/]"
+        )
+        console.print()
+        return
+
+    evidence_map = {
+        "HDR-001": "Strict-Transport-Security absent in response headers",
+        "HDR-002": "Content-Security-Policy absent in response headers",
+        "HDR-003": "X-Frame-Options absent in response headers",
+        "HDR-004": "X-Content-Type-Options absent in response headers",
+        "DNS-001": "Domain expiry date within 90 days — confirmed via WHOIS",
+        "DNS-002": "SPF TXT record absent — confirmed via DNS TXT query",
+        "DNS-003": "_dmarc TXT record absent — confirmed via DNS query",
+        "JS-001":  "AWS key regex (AKIA[0-9A-Z]{16}) matched in JS file",
+        "JS-002":  "Secret/token pattern matched in client-side JavaScript",
+        "PORT-001":"TCP connect to port 2375 succeeded",
+        "PORT-002":"TCP connect to port 6379 succeeded",
+        "PORT-003":"TCP connect to port 27017 succeeded",
+        "PORT-004":"TCP connect to port 9200 succeeded",
+        "PORT-005":"TCP connect to port 6443 succeeded",
+        "PORT-006":"TCP connect to port 23 succeeded",
+        "PORT-007":"TCP connect to port 3389 succeeded",
+        "ADM-001": "Admin URL path or page title matched admin keyword",
+        "SUB-001": "CNAME target returned service-specific unclaimed response",
+        "CVE-001": "CVE identifiers returned by Shodan for target IP",
+        "TECH-001":"WordPress content path pattern found in HTML",
+        "TECH-002":"ASP.NET __VIEWSTATE field found in HTML form",
+    }
+
+    impact_map = {
+        "HDR-001": "SSL stripping possible on same network segment",
+        "HDR-002": "XSS payloads execute without browser-level restriction",
+        "HDR-003": "Page embeddable in attacker-controlled iframe",
+        "HDR-004": "MIME-type confusion — browser may execute non-script as script",
+        "DNS-001": "Domain claimable by attacker if registration lapses",
+        "DNS-002": "Attacker can send email appearing to be from this domain",
+        "DNS-003": "Spoofed email passes inbox delivery — no policy enforcement",
+        "JS-001":  "Direct AWS API access without any vulnerability to exploit",
+        "JS-002":  "Potential authenticated API access via leaked credential",
+        "PORT-001":"Container escape to host filesystem — full server takeover",
+        "PORT-002":"Read/write all cached data — RCE via SLAVEOF command",
+        "PORT-003":"Full database read/write/delete without credentials",
+        "PORT-004":"Full Elasticsearch index access — data exfiltration",
+        "PORT-005":"Kubernetes cluster control if anonymous access enabled",
+        "PORT-006":"All traffic including credentials transmitted in cleartext",
+        "PORT-007":"Known exploit surface — BlueKeep and brute-force attacks",
+        "ADM-001": "Credential attacks directly on admin interface",
+        "SUB-001": "Attacker claims subdomain — phishing under target domain",
+        "CVE-001": "Known public exploits may apply to running software version",
+        "TECH-001":"WordPress-specific attacks: plugin CVEs, xmlrpc, /wp-admin",
+        "TECH-002":"ViewState deserialization RCE if MAC validation disabled",
+    }
+
+    confidence_map = {
+        "HDR-001":"High","HDR-002":"High","HDR-003":"High","HDR-004":"High",
+        "DNS-001":"High","DNS-002":"High","DNS-003":"High",
+        "JS-001": "High","JS-002":"Medium",
+        "PORT-001":"High","PORT-002":"High","PORT-003":"High",
+        "PORT-004":"High","PORT-005":"Medium","PORT-006":"High","PORT-007":"High",
+        "ADM-001":"Medium","SUB-001":"Medium",
+        "CVE-001":"Medium","TECH-001":"High","TECH-002":"High",
+    }
+
+    ordered = sorted(
+        hints,
+        key=lambda h: {
+            "Critical":0,"High":1,"Medium":2,"Low":3,"Info":4
+        }.get(h.get("severity","Info"),5)
+    )
+
+    for h in ordered:
+        sev_s = h.get("severity","Info")
+        hid   = h.get("id","")
+        conf  = confidence_map.get(hid,"Medium")
+
+        sev_clr  = {
+            "Critical":"red","High":"yellow",
+            "Medium":"bright_blue","Low":"dim"
+        }.get(sev_s,"dim")
+        conf_clr = {
+            "High":"bright_green","Medium":"yellow","Low":"dim"
+        }.get(conf,"dim")
+
+        console.print(
+            f"  [{sev_clr}][{sev_s}][/{sev_clr}]  "
+            f"[dim]Confidence:[/] [{conf_clr}]{conf}[/{conf_clr}]  "
+            f"[white]{h.get('title','')}[/]"
+        )
+        console.print(
+            f"  [dim]           Impact:   "
+            f"{impact_map.get(hid,'manual verification required')}[/]"
+        )
+        console.print(
+            f"  [dim]           Evidence: "
+            f"{evidence_map.get(hid,'automated detection')}[/]"
+        )
+        console.print()
+
+    console.print()
+
+
+# ══════════════════════════════════════════════════════
+#  SECTION 6 — RECOMMENDED NEXT TESTS
+#  Concrete, specific, based on actual findings
+# ══════════════════════════════════════════════════════
+
+def print_next_tests(results, config):
+
+    section("Recommended Next Tests")
+
+    hints     = results.get("vuln_hints",[])
+    tech      = results.get("tech_stack",[])
+    endpoints = results.get("js_endpoints",[])
+    emails    = results.get("emails",[])
+    cdn       = results.get("cdn",[])
+    waf       = results.get("waf",[])
+    secrets   = results.get("js_secrets",[])
+    takeovers = results.get("takeovers",[])
+    ports     = results.get("open_ports",[])
+    http      = results.get("http_services",[])
+    bf        = results.get("subdomain_bruteforce",{})
+    live_subs = bf.get("live",[])
+
     real_secrets = [
         s for s in secrets
         if "Internal IP" not in s.get("type","")
         and s.get("type","") not in ["Generic API Key","Generic Secret"]
     ]
-
-    # ── attack scenarios — correlations only ───────────
-    # only show combinations — single findings
-    # already shown in executive summary
-    scenarios = []
-
-    if has_no_csp and endpoints:
-        scenarios.append((
-            "red",
-            f"No CSP + {len(endpoints)} endpoints",
-            "XSS unrestricted -> inject via input -> steal session"
-        ))
-
-    # only show DMARC scenario if there are actual emails
-    # "0 targets" looks bad and is not actionable
-    if has_no_dmarc and emails:
-        scenarios.append((
-            "yellow",
-            f"No DMARC + {len(emails)} emails harvested",
-            "spoof domain -> targeted phishing -> credential theft"
-        ))
-    elif has_no_dmarc and not emails:
-        # DMARC missing but no emails found
-        # show as standalone note, not a full scenario
-        scenarios.append((
-            "bright_blue",
-            "No DMARC",
-            "domain spoofable — harvest emails via LinkedIn first"
-        ))
-
-    if has_no_hsts and login_pages:
-        scenarios.append((
-            "yellow",
-            f"No HSTS + {len(login_pages)} login page(s)",
-            "SSL strip on local network -> creds in cleartext"
-        ))
-
-    if real_secrets and endpoints:
-        scenarios.append((
-            "red",
-            f"{len(real_secrets)} JS credential(s) + "
-            f"{len(endpoints)} API endpoints",
-            "auth with key -> API access -> enumerate / escalate"
-        ))
-
-    if sens_ports and not waf:
-        svc_list = ", ".join(
-            str(p.get("port","")) for p in sens_ports[:2]
-        )
-        scenarios.append((
-            "red",
-            f"No WAF + port(s) {svc_list}",
-            "direct connect -> test default auth -> data access"
-        ))
-
-    if takeovers and has_no_dmarc:
-        scenarios.append((
-            "red",
-            "Takeover candidate + No DMARC",
-            "own subdomain + spoof email -> undetectable phishing"
-        ))
-
-    if scenarios:
-        console.print("  [bold bright_green]Attack Scenarios[/]")
-        console.print()
-        for color, condition, chain in scenarios:
-            console.print(
-                f"  [{color}]>[/{color}]  [white]{condition}[/]"
-            )
-            console.print(
-                f"  [dim]     -> {chain}[/]"
-            )
-            console.print()
-    else:
-        # clean target — say it clearly
-        console.print(
-            "  [dim]No compound attack scenarios identified.[/]\n"
-            "  [dim]Target shows standard web exposure — "
-            "focus on manual testing.[/]"
-        )
-        console.print()
-
-    # ── attacker POV — realistic sequence ─────────────
-    console.print("  [bold bright_green]Attacker POV[/]")
-    console.print()
-    console.print(
-        "  [dim]Most likely test sequence:[/]"
-    )
-    console.print()
+    sens_ports = [
+        p for p in ports
+        if p.get("port") in {2375,6379,27017,9200,6443,2379,23,3389}
+    ]
+    admin_svcs  = [s for s in http if s.get("is_admin")]
+    login_svcs  = [s for s in http if s.get("is_login")]
+    has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
 
     steps = []
 
+    # ── Priority 1: immediate actions ─────────────────
     if takeovers:
-        steps.append(
-            f"Register {takeovers[0].get('service','')} "
-            f"resource -> claim "
-            f"`{takeovers[0].get('subdomain','')}`"
-        )
+        steps.append((
+            "red", "Subdomain Takeover",
+            f"Register `{takeovers[0].get('service','')}` resource — "
+            f"verify you can claim `{takeovers[0].get('subdomain','')}`"
+        ))
+
     if real_secrets:
         s = real_secrets[0]
-        steps.append(
-            f"Validate {s.get('type','')} from JS "
-            f"-> test against its service"
-        )
+        steps.append((
+            "red", "Credential Validation",
+            f"Test {s.get('type','')} against its service — "
+            f"confirm validity before reporting"
+        ))
+
     if sens_ports:
         p   = sens_ports[0]
         lbl, _, opp = port_intel(p.get("port",""))
-        steps.append(
-            f"Connect to {p.get('host','')}:{p.get('port','')} "
-            f"({lbl}) -> {opp}"
-        )
-    if not steps and waf:
-        steps.append(
-            f"WAF detected ({', '.join(waf)}) — "
-            f"find origin IP via cert history / DNS"
-        )
-        steps.append(
-            "Test business logic and IDOR on API endpoints"
-        )
-    if has_no_dmarc and emails:
-        steps.append(
-            f"Use {len(emails)} harvested emails — "
-            f"craft spoofed phishing campaign"
-        )
-    if endpoints and not steps:
-        steps.append(
-            f"Probe {len(endpoints)} API endpoints — "
-            f"IDOR / auth bypass / rate limiting"
-        )
+        steps.append((
+            "red", "Unauthenticated Service",
+            f"Connect to {p.get('host','')}:{p.get('port','')} ({lbl}) — "
+            f"{opp}"
+        ))
 
-    # default for clean targets — honest, not scripted
+    # ── Priority 2: authentication testing ────────────
+    if admin_svcs:
+        steps.append((
+            "yellow", "Admin Panel Testing",
+            f"Test {admin_svcs[0].get('url','')} — "
+            f"default credentials, credential stuffing"
+        ))
+
+    if login_svcs:
+        steps.append((
+            "yellow", "Authentication Testing",
+            f"Test {len(login_svcs)} login page(s) — "
+            f"brute-force protection, account lockout, password policy"
+        ))
+
+    # ── Priority 3: API and endpoint testing ──────────
+    if endpoints:
+        steps.append((
+            "yellow", "API Authorization",
+            f"Test {len(endpoints)} discovered endpoint(s) — "
+            f"IDOR, missing auth, rate limiting, method override"
+        ))
+
+    # ── Priority 4: CDN bypass ────────────────────────
+    if cdn:
+        steps.append((
+            "yellow", "Origin IP Discovery",
+            f"CDN detected ({', '.join(cdn)}) — "
+            f"check: crt.sh history, SPF includes, "
+            f"old DNS records, email headers"
+        ))
+
+    # ── Priority 5: subdomain testing ─────────────────
+    if live_subs and len(live_subs) > 1:
+        steps.append((
+            "bright_blue", "Subdomain Access Control",
+            f"Test {len(live_subs)} live subdomain(s) — "
+            f"each may have different auth controls than main domain"
+        ))
+
+    # ── Priority 6: email spoofing ─────────────────────
+    if has_no_dmarc and emails:
+        steps.append((
+            "bright_blue", "Email Spoofing",
+            f"No DMARC — test with swaks: "
+            f"swaks --to target --from spoof@{config['target']}"
+        ))
+
+    # ── Priority 7: CMS specific ──────────────────────
+    if "WordPress" in tech:
+        steps.append((
+            "bright_blue", "WordPress Testing",
+            "wpscan --url target --enumerate p,u — "
+            "check plugins, users, xmlrpc"
+        ))
+
+    if "Drupal" in tech:
+        steps.append((
+            "bright_blue", "Drupal Testing",
+            "Check Drupalgeddon2 (CVE-2018-7600) — "
+            "verify patched version"
+        ))
+
+    # ── Priority 8: business logic ─────────────────────
     if not steps:
         steps = [
-            "Run Burp Suite on live HTTP services",
-            "Check robots.txt, sitemap.xml on all subdomains",
-            "Test session management and auth flows manually",
+            ("dim", "Manual Browse",
+             "Map application flows — auth, state changes, user roles"),
+            ("dim", "Business Logic",
+             "Test: price manipulation, workflow bypass, "
+             "privilege escalation"),
+            ("dim", "Information Disclosure",
+             "Check robots.txt, sitemap.xml, "
+             "/.well-known/security.txt, error pages"),
         ]
 
-    for i, step in enumerate(steps[:4], 1):
-        console.print(f"  [dim]{i}.  {step}[/]")
-    console.print()
-   
-
-
-def print_executive_summary(results, config, elapsed):
-    """
-    prints first — executive summary at top.
-    risk level + reason, fingerprinting,
-    recommended testing focus, top findings.
-    no repetition of what raw sections will show.
-    """
-
-    section("Executive Summary")
-
-    hints      = results.get("vuln_hints", [])
-    waf        = results.get("waf", [])
-    tech       = results.get("tech_stack", [])
-    secrets    = results.get("js_secrets", [])
-    takeovers  = results.get("takeovers", [])
-    ports      = results.get("open_ports", [])
-    endpoints  = results.get("js_endpoints", [])
-    emails     = results.get("emails", [])
-    subdomains = results.get("subdomains", [])
-    http       = results.get("http_services", [])
-    dns        = results.get("dns_records", {})
-    int_txt    = dns.get("interesting_txt", [])
-
-    def sev(s):
-        return sum(1 for h in hints if h.get("severity") == s)
-
-    # helpers
-    sens_ports = [
-        p for p in ports
-        if p.get("port") in {2375,6379,27017,9200,6443,2379,23,3389,5900}
-    ]
-    real_secrets = [
-        s for s in secrets
-        if "Internal IP" not in s.get("type","")
-        and s.get("type","") not in ["Generic API Key","Generic Secret"]
-    ]
-    admin_svcs = [s for s in http if s.get("is_admin")]
-    has_no_dmarc = any(
-        "DMARC" in h.get("title","") for h in hints
-    )
-    has_no_csp = any(
-        "CSP" in h.get("title","") for h in hints
-    )
-
-    # ── target line ────────────────────────────────────
-    console.print(
-        f"  [dim]Target[/]    "
-        f"[bold white]{config['target']}[/]  "
-        f"[dim]IP[/] [white]{results.get('ip','?')}[/]  "
-        f"[dim]Server[/] [white]{results.get('server','?')}[/]"
-    )
-    console.print()
-
-    # ── risk level + reasons ───────────────────────────
-    # calculate
-    if (sev("Critical") > 0 or takeovers
-            or real_secrets or sens_ports):
-        risk     = "HIGH"
-        risk_clr = "red"
-    elif sev("High") > 0 or sev("Medium") >= 3 and not all(
-        "header" in h.get("title","").lower() or "expires" in h.get("title","").lower()
-        for h in hints if h.get("severity") == "Medium"):
-        risk     = "MEDIUM"
-        risk_clr = "yellow"
-    else:
-        risk     = "LOW"
-        risk_clr = "bright_green"
-    
-
-    console.print(
-        f"  [dim]Risk[/]      "
-        f"[{risk_clr}]{risk}[/{risk_clr}]  "
-        f"[dim]·  {sev('Critical')} crit  "
-        f"{sev('High')} high  "
-        f"{sev('Medium')} med[/]"
-    )
-    console.print()
-
-    # reasons — only show real ones, skip empty
-    reasons = []
-    if takeovers:
-        reasons.append(
-            f"{len(takeovers)} subdomain takeover candidate(s)"
-        )
-    if real_secrets:
-        reasons.append(
-            f"{len(real_secrets)} credential(s) in JS files"
-        )
-    if sens_ports:
-        names = []
-        for p in sens_ports[:2]:
-            lbl, _, _ = port_intel(p.get("port",""))
-            names.append(lbl or str(p.get("port","")))
-        reasons.append(
-            f"sensitive service(s) exposed: {', '.join(names)}"
-        )
-    if sev("Critical") > 0:
-        reasons.append(f"{sev('Critical')} critical finding(s)")
-    if has_no_dmarc:
-        reasons.append("no DMARC — domain spoofable")
-
-    if reasons:
-        console.print("  [dim]Reason[/]")
-        for r in reasons:
-            console.print(f"  [dim]    -  {r}[/]")
-        console.print()
-
-    # ── fingerprinting ─────────────────────────────────
-    
-    waf = results.get("waf", [])
-    cdn = results.get("cdn", [])
-
-    console.print("  [bold bright_green]Fingerprinting[/]")
-    console.print()
-
-    # WAF — only if true WAF detected
-    if waf:
-       strong = any(
-          w in waf
-          for w in ["Cloudflare WAF","Akamai WAF",
-                  "Imperva","AWS WAF","F5 BIG-IP ASM"]
-       )
-       console.print(
-            f"  [dim]WAF[/]       [red]{' + '.join(waf)}[/]  "
-            f"[dim]-> "
-            + ("strong — focus IDOR / logic / origin IP"
-               if strong else
-               "present — injection may be filtered")
-            + "[/]"
-       )
-    else:
-         console.print(
-          "  [dim]WAF[/]       [dim]none detected[/]"
-         )
-
-    # CDN — separate from WAF
-    if cdn:
-         console.print(
-         f"  [dim]CDN[/]       [yellow]{' + '.join(cdn)}[/]  "
-         f"[dim]-> real IP hidden — find origin[/]"
-         )
-    else:
-         console.print(
-         "  [dim]CDN[/]       [dim]none detected[/]"
-         )   
-    if tech:
-        console.print()
-         # group by category
-        categories = {
-              "Web Server": ["Nginx","Apache","IIS","Litespeed","Tomcat"],
-              "Framework":  ["Laravel","Django","Ruby on Rails","ASP.NET",
-                                 "Spring Boot","Symfony","Flask","PHP"],
-              "Frontend":   ["React","Vue.js","Angular","Next.js",
-                                  "jQuery","Bootstrap"],
-              "CMS":        ["WordPress","Drupal","Joomla","Magento",
-                                   "Shopify","Wix","Squarespace","WooCommerce"],
-             
-        }
-
-        tech_attack = {
-               "WordPress":       "xmlrpc.php · plugin CVEs · /wp-admin BF",
-               "Drupal":          "Drupalgeddon CVEs · module exploits",
-               "Joomla":          "component vulns · admin panel BF",
-               "Magento":         "admin panel · Magmi upload · SQLi history",
-               "Laravel":         ".env leak · APP_DEBUG=true",
-               "Django":          "DEBUG mode · /admin BF · CSRF on APIs",
-               "ASP.NET":         "ViewState deser · IIS shortname",
-               "Next.js":         "/_next/data/ unauthed · API route auth",
-               "React":           "secrets in bundle · JWT in localStorage",
-               "Angular":         "env vars in bundle · source maps",
-               "PHP":             "LFI / RFI · type juggling",
-               "Nginx":           "alias traversal · proxy open redirect",
-               "Apache":          "dir listing · .htaccess bypass",
-               "IIS":             "shortname vuln · WebDAV",
-               "Spring Boot":     "/actuator — info disclosure",
-               "Tomcat":          "manager default creds · PUT method",
-               "Shopify":         "IDOR · checkout bypass · discount abuse",
-               "Cloudflare Pages":"find origin IP · focus app logic",
-               "Cloudflare":      "find origin IP · bypass CDN",
-               "Vercel":          "find origin · env var leaks in JS",
-               "Netlify":         "find origin · build log exposure",
-               "AWS CloudFront":  "find origin · S3 bucket check",
-        }    
-             
-
-        all_cat_members = [m for ms in categories.values() for m in ms]
-        shown = set()
-
-        for cat, members in categories.items():
-            matching = [t for t in tech if t in members]
-            for t in matching:
-                if t in shown:
-                    continue
-                shown.add(t)
-                vec = tech_attack.get(t, "check CVEs / defaults")
-                console.print(
-                    f"  [dim]{cat:<12}[/]  "
-                    f"[white]{t}[/]  "
-                    f"[dim]-> {vec}[/]"
-                )
-
-        cdn_tech = {
-            "Cloudflare","Cloudflare Pages","Fastly",
-            "AWS CloudFront","Vercel","Netlify",
-            "GitHub Pages","Akamai CDN"
-        }
-        for t in tech:
-            if t not in shown and t not in cdn_tech:
-                console.print(
-                    f"  [dim]{'Other':<12}[/]  [white]{t}[/]"
-                )
-    console.print()
-
-    # ── recommended testing focus ──────────────────────
-    console.print("  [bold bright_green]Recommended Testing Focus[/]")
-    console.print()
-
-    high_f   = []
-    medium_f = []
-    low_f    = []
-
-    # high — based on real findings only
-    if takeovers:
-        high_f.append(
-            "Subdomain takeover — register service, test cookie scope"
-        )
-    if real_secrets:
-        high_f.append(
-            "Credential validation — test leaked keys against services"
-        )
-    if sens_ports:
-        high_f.append(
-            "Unauthenticated service access — "
-            + ", ".join(
-                str(p.get("port","")) for p in sens_ports[:2]
-            )
-        )
-    if admin_svcs:
-        high_f.append(
-            "Admin panel — default creds / brute-force"
-        )
-    if any(t in tech for t in
-           ["React","Angular","Vue.js","Next.js"]):
-        high_f.append(
-            "API authorization — JS app relies on backend API"
-        )
-    if any(t in tech for t in
-           ["WordPress","Drupal","Magento","Joomla"]):
-        high_f.append(
-            "CMS exploits — plugin CVEs / admin panel access"
-        )
-
-    # medium
-    if waf and any(
-        w in waf
-        for w in ["Cloudflare","Akamai","AWS CloudFront","Fastly"]
-    ):
-        medium_f.append(
-            "Origin IP discovery — bypass CDN to reach real server"
-        )
-    if endpoints:
-        medium_f.append(
-            f"API endpoint testing — {len(endpoints)} paths "
-            f"(IDOR / auth bypass)"
-        )
-    if has_no_dmarc:
-        medium_f.append(
-            "Email spoofing — domain has no DMARC protection"
-        )
-    if any(t in tech for t in
-           ["Laravel","Django","ASP.NET","Spring Boot","PHP"]):
-        medium_f.append(
-            "Framework misconfig — debug mode / config exposure"
-        )
-
-    # low
-    missing_hdr_svcs = [
-        s for s in http if s.get("missing_headers")
-    ]
-    if missing_hdr_svcs:
-        low_f.append(
-            "Security headers — CSP / HSTS / X-Frame-Options"
-        )
-    if len(subdomains) > 5:
-        low_f.append(
-            f"Subdomain review — {len(subdomains)} found, "
-            f"check each for auth gaps"
-        )
-
-    if high_f:
-        console.print("  [red]High[/]")
-        for f in high_f[:4]:
-            console.print(f"  [dim]    -  {f}[/]")
-        console.print()
-    if medium_f:
-        console.print("  [yellow]Medium[/]")
-        for f in medium_f[:3]:
-            console.print(f"  [dim]    -  {f}[/]")
-        console.print()
-    if low_f:
-        console.print("  [bright_blue]Low[/]")
-        for f in low_f[:2]:
-            console.print(f"  [dim]    -  {f}[/]")
-        console.print()
-
-    if not high_f and not medium_f:
+    for i, (color, label, detail) in enumerate(steps[:8], 1):
         console.print(
-            "  [dim]-  No critical automated findings[/]\n"
-            "  [dim]-  Manual testing: auth flows, IDOR, business logic[/]"
+            f"  [{color}]{i}.[/{color}]  "
+            f"[white]{label}[/]"
+        )
+        console.print(
+            f"  [dim]     {detail}[/]"
         )
         console.print()
-
-    # ── top findings — evidence-backed, no repetition ──
-    if hints:
-        console.print("  [bold bright_green]Findings[/]")
-        console.print()
-
-        evidence_map = {
-            "HDR-001": "Strict-Transport-Security absent in response",
-            "HDR-002": "Content-Security-Policy absent in response",
-            "HDR-003": "X-Frame-Options absent in response",
-            "HDR-004": "X-Content-Type-Options absent in response",
-            "DNS-001": "Expiry date within 90 days per WHOIS",
-            "DNS-002": "No SPF TXT record found for domain",
-            "DNS-003": "_dmarc TXT record lookup returned empty",
-            "JS-001":  "AWS key pattern matched in JS bundle",
-            "JS-002":  "Secret pattern matched in client-side JS",
-            "PORT-001":"Port 2375 TCP connect confirmed",
-            "PORT-002":"Port 6379 responded without auth",
-            "PORT-003":"Port 27017 responded without auth",
-            "PORT-004":"Port 9200 responded without auth",
-            "PORT-005":"Port 6443 TCP connect confirmed",
-            "PORT-006":"Port 23 Telnet responded",
-            "PORT-007":"Port 3389 RDP responded",
-            "ADM-001": "Login keywords in page title or URL path",
-            "SUB-001": "CNAME target returned unclaimed service page",
-            "CVE-001": "CVE IDs returned by Shodan for this IP",
-            "TECH-001":"WordPress paths in HTML source",
-            "TECH-002":"__VIEWSTATE field in HTML",
-        }
-
-        impact_map = {
-            "HDR-001": "SSL stripping possible on local network",
-            "HDR-002": "XSS payload execution unrestricted",
-            "HDR-003": "Clickjacking via iframe embed",
-            "HDR-004": "MIME-type confusion attacks",
-            "DNS-001": "Domain hijack if not renewed",
-            "DNS-002": "Domain spoofable for email phishing",
-            "DNS-003": "Phishing email lands in inbox — no SPF check",
-            "JS-001":  "Direct AWS access without exploit",
-            "JS-002":  "Authenticated service access via leaked key",
-            "PORT-001":"Full server takeover via container escape",
-            "PORT-002":"Read/write all data — potential RCE",
-            "PORT-003":"Full database access without credentials",
-            "PORT-004":"Full Elasticsearch access",
-            "PORT-005":"Kubernetes cluster control",
-            "PORT-006":"Credentials visible on network",
-            "PORT-007":"Brute-force / known exploit surface",
-            "ADM-001": "Credential attack surface exposed",
-            "SUB-001": "Subdomain claimable for phishing",
-            "CVE-001": "Known exploits may apply",
-            "TECH-001":"Plugin CVEs / admin panel exposure",
-            "TECH-002":"Deserialization risk if MAC check disabled",
-        }
-
-        # sort critical first
-        ordered = sorted(
-            hints,
-            key=lambda h: {
-                "Critical":0,"High":1,
-                "Medium":2,"Low":3,"Info":4
-            }.get(h.get("severity","Info"), 5)
-        )
-
-        for h in ordered[:8]:
-            sev_s  = h.get("severity","Info")
-            title  = h.get("title","")
-            hid    = h.get("id","")
-
-            sev_clr = {
-                "Critical": "red",
-                "High":     "yellow",
-                "Medium":   "bright_blue",
-                "Low":      "dim",
-                "Info":     "dim",
-            }.get(sev_s, "dim")
-
-            ev  = evidence_map.get(hid, "detected via automated scan")
-            imp = impact_map.get(hid, "")
-
-            console.print(
-                f"  [{sev_clr}][{sev_s}][/{sev_clr}]  "
-                f"[white]{title}[/]"
-            )
-            if imp:
-                console.print(
-                    f"  [dim]           Impact:   {imp}[/]"
-                )
-            console.print(
-                f"  [dim]           Evidence: {ev}[/]"
-            )
-            console.print()
-
-    # ── divider before raw sections ────────────────────
-    console.print(
-        f"  [dim]── raw recon data below  ·  "
-        f"{round(elapsed,1)}s ──[/]"
-    )
-    console.print()
- 
-
    
 
 
@@ -1587,21 +1634,20 @@ def main():
     except Exception:
         pass
 
-    # ── print in correct order ─────────────────────────
-    # executive summary FIRST — most important at top
     if not config["quiet"]:
         print_executive_summary(results, config, elapsed)
-        print_passive_results(results)
-        print_active_results(results)
-        print_services_results(results)
-        print_analysis_results(results)
+        print_target_info(results, config)
+        print_attack_surface(results)
+        print_tech_fingerprinting(results)
+        print_findings(results)
+       print_next_tests(results, config)
 
-    # single footer line — no section header
+    # single footer line
     console.print(
-        f"  [dim]done  ·  {config['target']}  ·  "
-        f"{round(elapsed,1)}s"
-        + (f"  ·  report -> {report_path}" if report_path else "")
-        + "[/]\n"
+         f"  [dim]done  ·  {config['target']}  ·  "
+         f"{round(elapsed,1)}s"
+         + (f"  ·  report -> {report_path}" if report_path else "")
+         + "[/]\n"
     )
 
 if __name__ == "__main__":
