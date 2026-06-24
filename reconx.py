@@ -495,14 +495,18 @@ def print_active_results(results):
         medium   = [(s,t,c,p) for s,t,c,p in tagged if p == 2]
         standard = [(s,t,c,p) for s,t,c,p in tagged if p <= 1]
 
+        # In the subdomains count line:
+        critical_live = [x for x in critical if x[0].get("status") != 404]
+
         console.print(
             f"  [dim]Subdomains[/]  "
-            f"[white]{len(live)} live[/]  "
-            f"[dim]·[/]  [red]{len(critical)} critical[/]  "
-            f"[dim]·[/]  [yellow]{len(medium)} medium[/]  "
-            f"[dim]·[/]  [dim]{len(standard)} standard[/]"
+            f"[white]{len(live)} live[/]  [dim]·[/]  "
+            f"[red]{len(critical_live)} critical[/]  [dim]·[/]  "
+            f"[yellow]{len(medium)} medium[/]  [dim]·[/]  "
+            f"[dim]{len(standard) + (len(critical) - len(critical_live))} standard[/]"
         )
-        console.print()
+
+       
 
         # In print_active_results(), update the critical display:
         if critical:
@@ -513,7 +517,7 @@ def print_active_results(results):
 
               # 404 = not found, don't highlight as critical entry point
               if status == 404:
-              color = "dim"
+                 color = "dim"
 
               st = (
                   f"[bright_green]{status}[/]" if status == 200
@@ -527,6 +531,7 @@ def print_active_results(results):
                   f"{st}  [{color}][{tag}][/{color}]"
                   + (f"  [dim]{title}[/]" if title else "")
               )
+        
 
         if medium:
             for s, tag, color, _ in medium[:5]:
