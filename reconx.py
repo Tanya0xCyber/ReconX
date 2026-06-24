@@ -747,6 +747,7 @@ def print_attack_surface(results):
     emails    = results.get("emails",[])
 
     # ── Live Subdomains ────────────────────────────────
+    # ── Live Subdomains — show ALL critical and medium ──
     if live or takeovers:
         console.print("  [bold bright_green]Live Subdomains[/]")
         console.print()
@@ -762,7 +763,6 @@ def print_attack_surface(results):
             console.print()
 
         if live:
-            # split by tag priority — exclude 404
             tagged = []
             for s in live:
                 name = s.get("subdomain","")
@@ -782,44 +782,60 @@ def print_attack_surface(results):
                 if p <= 1 or s.get("status") == 404
             ]
 
-            console.print(
-                f"  [dim]Total[/]  "
-                f"[white]{len(live)}[/]  [dim]·[/]  "
-                f"[red]{len(critical)} critical[/]  [dim]·[/]  "
-                f"[yellow]{len(medium)} medium[/]  [dim]·[/]  "
-                f"[dim]{len(standard)} standard[/]"
-            )
-            console.print()
+             console.print(
+                 f"  [dim]Total[/]  "
+                 f"[white]{len(live)}[/]  [dim]·[/]  "
+                 f"[red]{len(critical)} critical[/]  [dim]·[/]  "
+                 f"[yellow]{len(medium)} medium[/]  [dim]·[/]  "
+                 f"[dim]{len(standard)} standard[/]"
+             )
+             console.print()
 
-            for s, tag, color, _ in critical[:8]:
+             # show ALL critical — no cap
+             for s, tag, color, _ in critical:
                 name   = s.get("subdomain","")
                 status = s.get("status","—")
-                title  = (s.get("title") or "")[:28]
+                title  = (s.get("title") or "")[:35]
                 st = (
                     f"[bright_green]{status}[/]" if status == 200
                     else f"[yellow]{status}[/]" if str(status).startswith("3")
-                    else f"[red]{status}[/]" if status in [401,403]
+                    else f"[red]{status}[/]"    if status in [401,403]
                     else f"[dim]{status}[/]"
                 )
                 console.print(
-                    f"  [{color}]>[/{color}]  "
-                    f"[white]{name}[/]  {st}  "
-                    f"[{color}][{tag}][/{color}]"
+                    f"  [red]>[/]  [white]{name}[/]  "
+                    f"{st}  [{color}][{tag}][/{color}]"
                     + (f"  [dim]{title}[/]" if title else "")
                 )
 
-            for s, tag, color, _ in medium[:4]:
-                name   = s.get("subdomain","")
-                status = s.get("status","—")
-                console.print(
-                    f"  [yellow]·[/]  [white]{name}[/]  "
-                    f"[dim]{status}[/]  [{color}][{tag}][/{color}]"
-                )
+                # show ALL medium
+                for s, tag, color, _ in medium:
+                   name   = s.get("subdomain","")
+                   status = s.get("status","—")
+                   title  = (s.get("title") or "")[:35]
+                   st = (
+                     f"[bright_green]{status}[/]" if status == 200
+                     else f"[yellow]{status}[/]" if str(status).startswith("3")
+                     else f"[red]{status}[/]"    if status in [401,403]
+                     else f"[dim]{status}[/]"
+                   )
+                   console.print(
+                       f"  [yellow]·[/]  [white]{name}[/]  "
+                       f"[dim]{status}[/]  [{color}][{tag}][/{color}]"
+                       + (f"  [dim]{title}[/]" if title else "")
+                   )
 
-            if standard:
-                console.print(
-                    f"  [dim]+ {len(standard)} standard in report[/]"
-                )
+             # show standard — all of them, compact
+             if standard:
+                console.print()
+                console.print(f"  [dim]Standard ({len(standard)}):[/]")
+                for s, tag, color, _ in standard:
+                    name   = s.get("subdomain","")
+                    status = s.get("status","—")
+                    console.print(
+                        f"  [dim]  · {name}  {status}[/]"
+                    )
+
         console.print()
 
     # ── Open Ports ─────────────────────────────────────
@@ -904,11 +920,20 @@ def print_attack_surface(results):
         if "api" in s.get("subdomain","").lower()
         and s.get("status") != 404
     ]
-
     api_endpoints = [
         e for e in endpoints
-        if "/api/" in e.lower() or e.lower().startswith("/v")
+        if "/api/" in e.lower()
+        or e.lower().startswith("/v1")
+        or e.lower().startswith("/v2")
+        or e.lower().startswith("/v3")
     ]
+
+    if api_endpoints:
+        console.print("  [bold bright_green]API Endpoints[/]")
+        console.print()
+        for e in api_endpoints:
+             console.print(f"  [yellow]>[/]  [white]{e}[/]")
+        console.print()
 
     if api_subs or api_endpoints:
         console.print("  [bold bright_green]APIs[/]")
