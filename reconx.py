@@ -730,7 +730,7 @@ def print_target_info(results, config):
 # ══════════════════════════════════════════════════════
 #  SECTION 3 — ATTACK SURFACE
 #  Subdomains, Ports, APIs, Login/Admin, Endpoints,
-#  Emails
+#  Emails , exposed files 
 # ══════════════════════════════════════════════════════
 
 def print_attack_surface(results):
@@ -869,23 +869,25 @@ def print_attack_surface(results):
                 )
 
         # uncommon web ports
-        unusual = [p for p in web_ports if p[0].get("port","") not in {80,443}]
         if unusual:
             console.print()
             console.print("  [bright_blue]Uncommon web ports:[/]")
             for p, label, opp in unusual[:4]:
+                # p is the port dict, not a nested tuple
+                host = p.get("host","") if isinstance(p, dict) else ""
+                num  = p.get("port","") if isinstance(p, dict) else ""
                 console.print(
                     f"  [bright_blue]·[/]  "
-                    f"[white]{p[0].get('host','')}:{p[0].get('port','')}[/]  "
+                    f"[white]{host}:{num}[/]  "
                     f"[dim]{label}[/]"
                 )
 
         # standard — just the count and port numbers
         std_nums = sorted(set(
-            str(p[0].get("port","")) for p in web_ports
-            if p[0].get("port","") in {80,443}
+             str(p.get("port","")) for p, label, opp in web_ports
+             if p.get("port","") in {80,443}
         ) | set(
-            str(p.get("port","")) for p in std_ports
+           str(p.get("port","")) for p in std_ports
         ), key=lambda x: int(x) if x.isdigit() else 0)
 
         if std_nums:
