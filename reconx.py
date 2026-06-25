@@ -878,15 +878,32 @@ def print_attack_surface(results):
         console.print()
 
     # ── Open Ports ─────────────────────────────────────
+    if ports:
+        console.print("  [bold bright_green]Open Ports[/]")
+        console.print()
+        
         web_ports  = []
         crit_ports = []
         high_ports = []
         std_ports  = []
-        
+
+        for p in ports:
+            num = p.get("port","")
+            label, risk, opp = port_intel(num)
+            if risk == "crit":
+                crit_ports.append((p, label, opp))
+            elif risk == "high":
+                high_ports.append((p, label, opp))
+            elif num in {80,443,8080,8443,8000,8888,3000}:
+                web_ports.append((p, label or p.get("service",""), opp))
+            else:
+                std_ports.append(p)
+                
         unusual = [
             (p, label, opp) for p, label, opp in web_ports
             if p.get("port","") not in {80,443}
         ]
+        
 
         # only print header if there's something interesting
         has_interesting = bool(crit_ports or high_ports or unusual)
@@ -895,7 +912,36 @@ def print_attack_surface(results):
             console.print("  [bold bright_green]Open Ports[/]")
             console.print()
 
-           
+            if crit_ports:
+                console.print("  [dim]Critical:[/]")
+                for p, label, opp in crit_ports:
+                    host = p.get("host","")
+                    num  = p.get("port","")
+                    b = next(
+                      (x for x in banners
+                       if x.get("port")==num and x.get("host")==host),
+                       None
+                    )
+                    ver = f"  [dim]{b['version']}[/]" if b and b.get("version") else ""
+                    console.print(
+                       f"  [red]▸[/]  [bold white]{host}:{num}[/]  "
+                       f"[red]{label or p.get('service','')}[/]{ver}"
+                    )
+                    if opp:
+                       console.print(f"  [dim]     {opp}[/]")
+            console.print()
+            if high_ports:
+                console.print(f"  [bold yellow]High Risk Ports  ({len(high_ports)})[/]")
+                console.print()
+                for p, label, opp in high_ports[:6]:
+                    host = p.get("host","")
+                    num  = p.get("port","")
+                    console.print(
+                       f"  [yellow]▸[/]  [white]{host}:{num}[/]  "
+                       f"[yellow]{label or p.get('service','')}[/]  "
+                       f"[dim]{opp or ''}[/]"
+                    )
+                console.print()
             if unusual:
                 console.print("  [dim]Uncommon web ports:[/]")
                 for p, label, opp in unusual:
