@@ -698,15 +698,33 @@ def run_email_harvest(base_url, domain, config):
         "security_contacts": categorized["security"],
     }
 
+STATIC_EXTENSIONS = {
+    ".css", ".js", ".map", ".png", ".jpg", ".jpeg", ".gif",
+    ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot",
+    ".webp", ".mp4", ".mp3", ".pdf", ".zip", ".gz", ".json"
+}
+
 def filter_endpoints(endpoints, results):
     tech = results.get("tech_stack", [])
     filtered = []
     for ep in endpoints:
         ep_lower = ep.lower()
-        # wp-admin endpoints only relevant if WordPress detected
-        if any(x in ep_lower for x in ["wp-admin","wp-login","xmlrpc","wp-content"]):
+
+        # skip static assets — zero security value
+        if any(ep_lower.endswith(ext) for ext in STATIC_EXTENSIONS):
+            continue
+
+        # skip fragment-only or too short
+        if len(ep) < 5 or ep.startswith("#"):
+            continue
+
+        # skip WordPress paths if WordPress not detected
+        if any(x in ep_lower for x in [
+            "wp-admin","wp-login","xmlrpc","wp-content"
+        ]):
             if "WordPress" not in tech:
-                continue  # skip — WordPress not detected on this target
+                continue
+
         filtered.append(ep)
     return filtered
     
