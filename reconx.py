@@ -1499,11 +1499,6 @@ def print_next_tests(results, config):
     http      = results.get("http_services",[])
     bf        = results.get("subdomain_bruteforce",{})
     live_subs = bf.get("live",[])
-    interesting_subs = [
-        s for s in live_subs
-        if tag_subdomain(s.get("subdomain",""))[2] >= 2
-        and s.get("status") != 404
-    ]
 
     real_secrets = [
         s for s in secrets
@@ -1514,13 +1509,20 @@ def print_next_tests(results, config):
         p for p in ports
         if p.get("port") in {2375,6379,27017,9200,6443,2379,23,3389}
     ]
-    admin_svcs  = [s for s in http if s.get("is_admin")]
-    login_svcs  = [s for s in http if s.get("is_login")]
+    admin_svcs   = [s for s in http if s.get("is_admin")]
+    login_svcs   = [s for s in http if s.get("is_login")]
     has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
+
+    # interesting subs = non-standard, non-404
+    interesting_subs = [
+        s for s in live_subs
+        if tag_subdomain(s.get("subdomain",""))[2] >= 2
+        and s.get("status") != 404
+    ]
 
     steps = []
 
-    # ── Priority 1: immediate actions ─────────────────
+    # priority 1 — immediate
     if takeovers:
         steps.append((
             "red", "Subdomain Takeover",
@@ -1545,7 +1547,7 @@ def print_next_tests(results, config):
             f"{opp}"
         ))
 
-    # ── Priority 2: authentication testing ────────────
+    # priority 2 — auth
     if admin_svcs:
         steps.append((
             "yellow", "Admin Panel Testing",
@@ -1560,7 +1562,7 @@ def print_next_tests(results, config):
             f"brute-force protection, account lockout, password policy"
         ))
 
-    # ── Priority 3: API and endpoint testing ──────────
+    # priority 3 — api
     if endpoints:
         steps.append((
             "yellow", "API Authorization",
@@ -1568,7 +1570,7 @@ def print_next_tests(results, config):
             f"IDOR, missing auth, rate limiting, method override"
         ))
 
-    # ── Priority 4: CDN bypass ────────────────────────
+    # priority 4 — cdn
     if cdn:
         steps.append((
             "yellow", "Origin IP Discovery",
@@ -1577,20 +1579,21 @@ def print_next_tests(results, config):
             f"old DNS records, email headers"
         ))
 
-    # ── Priority 5: subdomain testing ─────────────────
+    # priority 5 — subdomains
     if interesting_subs:
-        medium_f.append(
-           f"Subdomain access control — "
-           f"{len(interesting_subs)} interesting subdomain(s) found"
-        )
+        steps.append((
+            "bright_blue", "Subdomain Access Control",
+            f"Test {len(interesting_subs)} interesting subdomain(s) — "
+            f"each may have different auth controls than main domain"
+        ))
     elif len(live_subs) > 3:
-    # only mention if there are enough to be worth checking
-        low_f.append(
+        steps.append((
+            "dim", "Subdomain Review",
             f"Review {len(live_subs)} live subdomains — "
             f"check for auth differences"
-        )
+        ))
 
-    # ── Priority 6: email spoofing ─────────────────────
+    # priority 6 — email spoofing
     if has_no_dmarc and emails:
         steps.append((
             "bright_blue", "Email Spoofing",
@@ -1598,7 +1601,7 @@ def print_next_tests(results, config):
             f"swaks --to target --from spoof@{config['target']}"
         ))
 
-    # ── Priority 7: CMS specific ──────────────────────
+    # priority 7 — CMS
     if "WordPress" in tech:
         steps.append((
             "bright_blue", "WordPress Testing",
@@ -1613,7 +1616,7 @@ def print_next_tests(results, config):
             "verify patched version"
         ))
 
-    # ── Priority 8: business logic ─────────────────────
+    # default — clean target
     if not steps:
         steps = [
             ("dim", "Manual Browse",
@@ -1635,8 +1638,6 @@ def print_next_tests(results, config):
             f"  [dim]     {detail}[/]"
         )
         console.print()
-   
-
 
 
 # ══════════════════════════════════════════════════════
