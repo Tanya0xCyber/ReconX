@@ -993,7 +993,6 @@ def print_attack_surface(results):
                 )
 
         console.print()
-
     # ── Login Pages ────────────────────────────────────
     login_pages = [
         s for s in http
