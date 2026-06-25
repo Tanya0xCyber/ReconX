@@ -348,6 +348,12 @@ def print_executive_summary(results, config, elapsed):
         f"{sev('Medium')} medium  "
         f"{sev('Low')} low[/]"
     )
+    if risk == "LOW" and (sev("Medium") > 0 or sev("Low") > 0):
+    console.print(
+        f"  [dim]          "
+        f"Header misconfigurations present — "
+        f"no critical attack surface found[/]"
+    )
     console.print()
 
     # ── Top Findings ──────────────────────────────────
@@ -472,6 +478,13 @@ def print_executive_summary(results, config, elapsed):
     medium_f = []
     low_f    = []
 
+    interesting_subs = [
+        s for s in live_subs
+        if tag_subdomain(s.get("subdomain",""))[2] >= 2  # priority >= 2
+        and s.get("status") != 404
+    ]
+
+
     # high — only when something concrete found
     if takeovers:
         high_f.append("Subdomain takeover — claim service, test cookie scope")
@@ -502,11 +515,22 @@ def print_executive_summary(results, config, elapsed):
         )
     if any(t in tech for t in ["Laravel","Django","ASP.NET","Spring Boot","PHP"]):
         medium_f.append("Framework misconfiguration — debug mode, config exposure")
-    if live_subs:
-        medium_f.append(
-            f"Subdomain access control — {len(live_subs)} live, "
-            f"each may have different auth"
-        )
+    # In print_executive_summary() and print_next_tests():
+    # Only add subdomain access control if there are non-standard subdomains
+
+   
+   if interesting_subs:
+      medium_f.append(
+         f"Subdomain access control — "
+         f"{len(interesting_subs)} interesting subdomain(s) found"
+      )
+   elif len(live_subs) > 3:
+      # only mention if there are enough to be worth checking
+      low_f.append(
+         f"Review {len(live_subs)} live subdomains — "
+         f"check for auth differences"
+      )
+    # if <= 3 standard subs — don't mention, not worth cluttering report
 
     # low — worth noting
     missing_hdrs = [s for s in http if s.get("missing_headers")]
@@ -861,6 +885,7 @@ def print_attack_surface(results):
                 std_ports.append(p)
 
         if crit_ports:
+            console.print("  [dim]Critical:[/]")
             for p, label, opp in crit_ports:
                 host = p.get("host","")
                 num  = p.get("port","")
@@ -877,26 +902,31 @@ def print_attack_surface(results):
                 )
 
         if high_ports:
+            console.print("  [dim]High risk:[/]")
             for p, label, opp in high_ports[:5]:
                 console.print(
                     f"  [yellow]>[/]  "
                     f"[white]{p.get('host','')}:{p.get('port','')}[/]  "
                     f"[yellow]{label}[/]  [dim]{opp}[/]"
                 )
-
+        # uncommon web ports
+        unusual = [
+            (p, label, opp) for p, label, opp in web_ports
+            if p.get("port","") not in {80,443}
+        ]    
         # uncommon web ports
         if unusual:
-            console.print()
             console.print("  [bright_blue]Uncommon web ports:[/]")
             for p, label, opp in unusual[:4]:
                 # p is the port dict, not a nested tuple
-                host = p.get("host","") if isinstance(p, dict) else ""
-                num  = p.get("port","") if isinstance(p, dict) else ""
+                host = p.get("host","") 
+                num  = p.get("port","") 
                 console.print(
                     f"  [bright_blue]·[/]  "
                     f"[white]{host}:{num}[/]  "
                     f"[dim]{label}[/]"
                 )
+            console.print()
 
         # standard — just the count and port numbers
         std_nums = sorted(set(
@@ -911,7 +941,8 @@ def print_attack_surface(results):
                 f"\n  [dim]Standard:  {' · '.join(std_nums)}[/]"
             )
         console.print()
-
+    else :
+        pass 
     # ── APIs ──────────────────────────────────────────
     api_subs = [
         s for s in (
@@ -1003,8 +1034,16 @@ def print_attack_surface(results):
             return "Internal endpoint"
         if "secret" in p or "key" in p:
             return "Secret/key path"
+        if "auth" in p or "login" in p or "token" in p:
+            return "Auth endpoint"
+        if "password" in p or "reset" in p:
+            return "Password endpoint"
         return "Sensitive path"
-
+        
+    if endpoints:
+        console.print("  [bold bright_green]Discovered Endpoints[/]")
+        console.print()
+    
     sens_eps = [
         e for e in endpoints
         if any(x in e.lower()
@@ -1018,6 +1057,13 @@ def print_attack_surface(results):
                           "password","reset","register"])
         and e not in sens_eps
     ]
+    api_eps = [
+        e for e in endpoints
+        if ("/api/" in e.lower()
+            or e.lower().startswith("/v"))
+        and e not in sens_eps
+        and e not in auth_eps
+    ]
     other_eps = [
         e for e in endpoints
         if e not in sens_eps and e not in auth_eps
@@ -1025,23 +1071,34 @@ def print_attack_surface(results):
         and not e.lower().startswith("/v")
     ]
 
-    if sens_eps or auth_eps:
-        console.print("  [bold bright_green]Sensitive Endpoints[/]")
-        console.print()
-        for e in sens_eps[:4]:
+    if sens_eps:
+        console.print("  [dim]Sensitive:[/]")
+        for e in sens_eps:
             console.print(
                 f"  [red]>[/]  [white]{e}[/]  "
                 f"[dim]{endpoint_label(e)}[/]"
             )
-        for e in auth_eps[:3]:
+        console.print()
+
+    if auth_eps:
+        console.print("  [dim]Auth-related:[/]")
+        for e in auth_eps:
             console.print(
                 f"  [yellow]>[/]  [white]{e}[/]  "
-                f"[dim]auth endpoint[/]"
+                f"[dim]{endpoint_label(e)}[/]"
             )
-        if other_eps:
-            console.print(
-                f"  [dim]+ {len(other_eps)} general in report[/]"
-            )
+        console.print()
+
+    if api_eps:
+        console.print("  [dim]API paths:[/]")
+        for e in api_eps:
+            console.print(f"  [dim]·  {e}[/]")
+        console.print()
+
+    if other_eps:
+        console.print("  [dim]Other endpoints:[/]")
+        for e in other_eps:
+            console.print(f"  [dim]·  {e}[/]")
         console.print()
 
     # ── Missing Security Headers (attack surface context) ──
@@ -1442,6 +1499,11 @@ def print_next_tests(results, config):
     http      = results.get("http_services",[])
     bf        = results.get("subdomain_bruteforce",{})
     live_subs = bf.get("live",[])
+    interesting_subs = [
+        s for s in live_subs
+        if tag_subdomain(s.get("subdomain",""))[2] >= 2
+        and s.get("status") != 404
+    ]
 
     real_secrets = [
         s for s in secrets
@@ -1516,12 +1578,17 @@ def print_next_tests(results, config):
         ))
 
     # ── Priority 5: subdomain testing ─────────────────
-    if live_subs and len(live_subs) > 1:
-        steps.append((
-            "bright_blue", "Subdomain Access Control",
-            f"Test {len(live_subs)} live subdomain(s) — "
-            f"each may have different auth controls than main domain"
-        ))
+    if interesting_subs:
+        medium_f.append(
+           f"Subdomain access control — "
+           f"{len(interesting_subs)} interesting subdomain(s) found"
+        )
+    elif len(live_subs) > 3:
+    # only mention if there are enough to be worth checking
+        low_f.append(
+            f"Review {len(live_subs)} live subdomains — "
+            f"check for auth differences"
+        )
 
     # ── Priority 6: email spoofing ─────────────────────
     if has_no_dmarc and emails:
