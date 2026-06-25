@@ -179,7 +179,7 @@ def run_stage(name, func, args, config, results):
         except Exception as e:
             elapsed = round(time.time() - stage_start, 2)
             console.print(
-                f"  [red]✗[/]  [red]{name}[/] [dim]failed ({elapsed}s)[/] — {e}"
+                f"  [red]-  {name} failed — {e}[/]"
             )
             if config.get("verbose"):
                 import traceback
@@ -188,10 +188,8 @@ def run_stage(name, func, args, config, results):
             return False
 
     elapsed = round(time.time() - stage_start, 2)
-    console.print(
-        f"  [bright_green]✓[/]  [bold white]{name}[/]  "
-        f"[dim]done in {elapsed}s[/]"
-    )
+    # store stage timing silently — shown in final summary
+    results[f"_stage_time_{name.lower().replace(' ','')}"] = elapsed
     return True
 
 # ══════════════════════════════════════════════════════
@@ -419,7 +417,7 @@ def print_executive_summary(results, config, elapsed):
             "ADM-001":"Medium","SUB-001":"Medium",
             "CVE-001":"Medium","TECH-001":"High","TECH-002":"High",
         }
-
+        console.print()
         console.print("  [bold bright_green]Top Findings[/]")
         console.print()
 
@@ -575,11 +573,27 @@ def print_target_info(results, config):
     waf = results.get("waf", [])
     cdn = results.get("cdn", [])
 
+    raw_server = results.get("server","—")
+
+    cdn_server_values = {
+        "cloudflare", "fastly", "cloudfront",
+        "vercel", "netlify", "akamai", "github.com"
+    }
+    server_is_cdn = any(
+        cdn_val in raw_server.lower()
+        for cdn_val in cdn_server_values
+    )
+
+    if server_is_cdn and cdn:
+        display_server = "Unknown (hidden behind CDN)"
+    else:
+        display_server = raw_server
+
     fields = [
         ("Domain",  config["target"]),
         ("IP",      results.get("ip","—")),
         ("HTTPS",   "Yes" if results.get("https") else "No"),
-        ("Server",  results.get("server","—")),
+        ("Server",  display_server),
     ]
 
     for k, v in fields:
@@ -765,6 +779,8 @@ def print_attack_surface(results):
     ports     = results.get("open_ports",[])
     banners   = results.get("banners",[])
     http      = results.get("http_services",[])
+    if not http:
+        console.print("  [dim]DEBUG: http_services is empty[/]")
     endpoints = results.get("js_endpoints",[])
     emails    = results.get("emails",[])
 
@@ -862,26 +878,7 @@ def print_attack_surface(results):
         console.print()
 
     # ── Open Ports ─────────────────────────────────────
-    if ports:
-        console.print("  [bold bright_green]Open Ports[/]")
-        console.print()
-
-        crit_ports = []
-        high_ports = []
-        web_ports  = []
-        std_ports  = []
-
-        for p in ports:
-            num = p.get("port","")
-            label, risk, opp = port_intel(num)
-            if risk == "crit":
-                crit_ports.append((p, label, opp))
-            elif risk == "high":
-                high_ports.append((p, label, opp))
-            elif num in {80,443,8080,8443,8000,8888,3000}:
-                web_ports.append((p, label or p.get("service",""), opp))
-            else:
-                std_ports.append(p)
+    
          
         unusual = [
             (p, label, opp) for p, label, opp in web_ports
@@ -895,36 +892,7 @@ def print_attack_surface(results):
             console.print("  [bold bright_green]Open Ports[/]")
             console.print()
 
-            if crit_ports:
-                console.print("  [dim]Critical:[/]")
-                for p, label, opp in crit_ports:
-                    host = p.get("host","")
-                    num  = p.get("port","")
-                    b = next(
-                        (x for x in banners
-                         if x.get("port")==num and x.get("host")==host),
-                        None
-                    )
-                    ver = (
-                        f"  [dim]{b['version']}[/]"
-                        if b and b.get("version") else ""
-                    )
-                    console.print(
-                        f"  [red]>[/]  [white]{host}:{num}[/]  "
-                        f"[red]{label}[/]{ver}  [dim]{opp}[/]"
-                    )
-                console.print()
-
-            if high_ports:
-                console.print("  [dim]High risk:[/]")
-                for p, label, opp in high_ports:
-                    console.print(
-                        f"  [yellow]>[/]  "
-                        f"[white]{p.get('host','')}:{p.get('port','')}[/]  "
-                        f"[yellow]{label}[/]  [dim]{opp}[/]"
-                    )
-                console.print()
-
+           
             if unusual:
                 console.print("  [dim]Uncommon web ports:[/]")
                 for p, label, opp in unusual:
@@ -944,19 +912,30 @@ def print_attack_surface(results):
             str(p.get("port","")) for p in std_ports
         ), key=lambda x: int(x) if x.isdigit() else 0)
 
+        PORT_LABELS = {
+            "80":   "HTTP",
+            "443":  "HTTPS",
+            "8080": "HTTP-Alt",
+            "8443": "HTTPS-Alt",
+            "8000": "HTTP-Dev",
+            "3000": "Node/Dev",
+            "8888": "HTTP-Dev",
+        }
+
         if std_nums:
+            labeled = [
+                f"{p}/tcp {PORT_LABELS[p]}"
+                if p in PORT_LABELS else f"{p}/tcp"
+                for p in std_nums
+            ]
             console.print(
-                f"  [dim]Ports scanned:  {' · '.join(std_nums)}[/]"
+                f"  [dim]Ports scanned:  "
+                f"{' · '.join(labeled)}[/]"
             )
             console.print()
+            
     # ── APIs ──────────────────────────────────────────
-    api_subs = [
-        s for s in (
-            results.get("subdomain_bruteforce",{}).get("live",[])
-        )
-        if "api" in s.get("subdomain","").lower()
-        and s.get("status") != 404
-    ]
+   
     api_endpoints = [
         e for e in endpoints
         if "/api/" in e.lower()
@@ -972,27 +951,10 @@ def print_attack_surface(results):
              console.print(f"  [yellow]>[/]  [white]{e}[/]")
         console.print()
 
-    if api_subs or api_endpoints:
-        console.print("  [bold bright_green]APIs[/]")
-        console.print()
-
-        for s in api_subs[:4]:
-            name   = s.get("subdomain","")
-            status = s.get("status","—")
-            title  = (s.get("title") or "")[:30]
-            console.print(
-                f"  [yellow]>[/]  [white]{name}[/]  "
-                f"[dim]{status}[/]"
-                + (f"  [dim]{title}[/]" if title else "")
-            )
-
-        if api_endpoints:
-            for e in api_endpoints[:5]:
-                console.print(
-                    f"  [dim]·  {e}[/]"
-                )
+   
 
         console.print()
+        
     # ── Login Pages ────────────────────────────────────
     login_pages = [
         s for s in http
@@ -1442,11 +1404,19 @@ def print_findings(results):
     }
 
     ordered = sorted(
-        hints,
+        [h for h in hints if h.get("severity") != "Info"],
         key=lambda h: {
-            "Critical":0,"High":1,"Medium":2,"Low":3,"Info":4
-        }.get(h.get("severity","Info"),5)
+            "Critical":0,"High":1,"Medium":2,"Low":3
+        }.get(h.get("severity","Low"),4)
     )
+
+    if not ordered:
+        console.print(
+            "  [dim]No confirmed findings from automated scan.[/]\n"
+            "  [dim]Proceed to manual testing.[/]"
+        )
+        console.print()
+        return
 
     for h in ordered:
         sev_s = h.get("severity","Info")
@@ -1612,13 +1582,15 @@ def print_next_tests(results, config):
             f"swaks --to target --from spoof@{config['target']}"
         ))
     # In print_next_tests():
-    if "Nginx" in tech:
+    if "Nginx" in tech and (
+        endpoints or admin_svcs or len(live_subs) > 3
+    ):
         steps.append((
             "dim", "Nginx Configuration Review",
             "Check alias path traversal: "
             "test /static../etc/passwd — "
             "verify proxy_pass header handling"
-    ))
+        ))
     # priority 7 — CMS
     if "WordPress" in tech:
         steps.append((
@@ -1748,6 +1720,12 @@ def main():
         console.print("\n  [yellow]!  interrupted[/]\n")
 
     elapsed = time.time() - total_start
+    console.print(
+        f"  [bright_green]+[/]  "
+        f"[dim]Recon completed  ·  "
+        f"Duration: {round(elapsed,1)}s[/]"
+    )
+    console.print()
 
     # ── save report silently ───────────────────────────
     report_path = None
