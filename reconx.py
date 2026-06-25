@@ -878,8 +878,11 @@ def print_attack_surface(results):
         console.print()
 
     # ── Open Ports ─────────────────────────────────────
-    
-         
+        web_ports  = []
+        crit_ports = []
+        high_ports = []
+        std_ports  = []
+        
         unusual = [
             (p, label, opp) for p, label, opp in web_ports
             if p.get("port","") not in {80,443}
