@@ -1,6 +1,6 @@
 <div align="center">
 
-```
+```text
 ██████╗ ███████╗ ██████╗ ██████╗ ███╗   ██╗██╗  ██╗
 ██╔══██╗██╔════╝██╔════╝██╔═══██╗████╗  ██║╚██╗██╔╝
 ██████╔╝█████╗  ██║     ██║   ██║██╔██╗ ██║ ╚███╔╝
@@ -8,89 +8,116 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██╔╝ ██╗
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝
 
-   automated recon pipeline · python · kali
-             Tanya Singh · 2026
+          Automated Reconnaissance Framework
+              Tanya Singh · v1.0 · 2026
 ```
 
 </div>
 
 ---
 
-##  What is ReconX?
+# Overview
 
-### ReconX is a 5-stage automated recon pipeline for pentesters and bug bounty hunters. One command — full recon from passive info gathering to a final report. 
+ReconX is an automated reconnaissance framework that collects, validates, and correlates publicly accessible information about a target before manual security testing begins.
+
+The project focuses on delivering accurate, evidence-based reconnaissance with minimal false positives, helping security professionals identify the most relevant areas for manual testing.
 
 ---
 
-##  Installation
+# Installation
 
 ```bash
 git clone https://github.com/Tanya0xCyber/ReconX.git
+
 cd ReconX
+
 pip3 install -r requirements.txt
 ```
 
 ---
 
-##  Usage
+# Usage
 
 ```bash
-python3 reconx.py -t target.com                   # full run
-python3 reconx.py -t target.com --only passive    # passive only
-python3 reconx.py -t target.com --no-ports        # skip ports
-python3 reconx.py -t target.com --output all      # all formats
-python3 reconx.py -t target.com --threads 30      # more threads
-python3 reconx.py -t target.com --shodan API_KEY  # + CVE data
+# Default scan
+python3 reconx.py -t target.com
+
+# Increase threads
+python3 reconx.py -t target.com --threads 30
+
+# Skip port scanning
+python3 reconx.py -t target.com --no-ports
+
+# Save JSON report
+python3 reconx.py -t target.com --output json
 ```
 
 ---
 
-##  Pipeline
+# Detection Capabilities
 
-| Stage | What it does |
-|---|---|
-| 0 · Validation | domain check · IP resolve · reachability |
-| 1 · Passive | WHOIS · DNS · crt.sh · Geo/ASN · Shodan |
-| 2 · Active | subdomain BF · JS secrets · email harvest |
-| 3 · Services | port scan · banner grab · HTTP probe |
-| 4 · Analysis | WAF · tech stack · vuln hints · attack chains |
-
----
-
-##  Chain Analyzer
-
-Automatically detects dangerous finding combinations:
-
-| Chain | Impact |
-|---|---|
-| JS Secret + API Endpoint | → Account Takeover |
-| Subdomain Takeover + Cookies | → Session Hijack |
-| No SPF + No DMARC | → Email Spoofing |
-| Docker Port 2375 Open | → Full Server RCE |
-| Database Port Exposed | → Direct Data Dump |
-| WordPress + Admin Panel | → Site Takeover |
+| Category       | Detection                                                   |
+| -------------- | ----------------------------------------------------------- |
+| Target         | IP, HTTPS, Server, CDN, WAF                                 |
+| DNS            | WHOIS, Nameservers, SPF, DMARC                              |
+| Attack Surface | Live Subdomains, Open Ports, APIs, Login Pages, Admin Pages |
+| Discovery      | Sensitive Endpoints, Exposed Files, Email Addresses         |
+| Fingerprinting | Web Server, Framework, CMS, Frontend, Hosting               |
+| Security       | HTTP Security Headers, Verified Misconfigurations           |
+| Analysis       | Risk Score, Confidence, Evidence, Testing Recommendations   |
 
 ---
 
-##  Reports
+# Report Structure
 
-```bash
---output html   # dark dashboard — opens in browser
---output json   # raw data
---output md     # for HackerOne / Bugcrowd
---output all    # all three
+Every scan produces a structured report containing:
+
+* Executive Summary
+* Target Information
+* Attack Surface
+* Technology Fingerprinting
+* Findings
+* Recommended Next Tests
+
+Reports are automatically saved inside:
+
+```text
+reports/
 ```
 
-Saved to `./reports/` after every scan.
+---
+
+# Why ReconX?
+
+ReconX does **not** attempt to exploit vulnerabilities.
+
+Its objective is to answer questions such as:
+
+* What is exposed?
+* What technologies are running?
+* Which findings are verified?
+* What should a pentester test next?
+* Where is the most promising attack surface?
 
 ---
 
-##  Legal
+# Future Improvements
 
-Only use on targets you have written permission to test.
-Unauthorized scanning is illegal. Use responsibly.
+* Better framework detection
+* Better WAF fingerprinting
+* More endpoint validation
+* Improved technology confidence
+* Better evidence collection
+* Faster enumeration
 
 ---
 
-*Know your target before they know you.*
-```
+# Legal
+
+Use ReconX only against systems you own or have explicit authorization to test.
+
+Unauthorized security testing may violate applicable laws and program policies.
+
+---
+
+*"Know your target before you test your target."*
