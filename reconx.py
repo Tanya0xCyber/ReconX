@@ -520,17 +520,17 @@ def print_executive_summary(results, config, elapsed):
 
    
    if interesting_subs:
-      medium_f.append(
-         f"Subdomain access control — "
-         f"{len(interesting_subs)} interesting subdomain(s) found"
-      )
+        medium_f.append(
+           f"Subdomain access control — "
+           f"{len(interesting_subs)} interesting subdomain(s) found"
+        )
    elif len(live_subs) > 3:
-      # only mention if there are enough to be worth checking
-      low_f.append(
-         f"Review {len(live_subs)} live subdomains — "
-         f"check for auth differences"
-      )
-    # if <= 3 standard subs — don't mention, not worth cluttering report
+        # only mention if there are enough to be worth checking
+        low_f.append(
+           f"Review {len(live_subs)} live subdomains — "
+           f"check for auth differences"
+        )
+        # if <= 3 standard subs — don't mention, not worth cluttering report
 
     # low — worth noting
     missing_hdrs = [s for s in http if s.get("missing_headers")]
