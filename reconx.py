@@ -349,11 +349,11 @@ def print_executive_summary(results, config, elapsed):
         f"{sev('Low')} low[/]"
     )
     if risk == "LOW" and (sev("Medium") > 0 or sev("Low") > 0):
-    console.print(
-        f"  [dim]          "
-        f"Header misconfigurations present — "
-        f"no critical attack surface found[/]"
-    )
+        console.print(
+           f"  [dim]          "
+           f"Header misconfigurations present — "
+           f"no critical attack surface found[/]"
+        )
     console.print()
 
     # ── Top Findings ──────────────────────────────────
