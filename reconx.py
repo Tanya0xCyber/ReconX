@@ -771,7 +771,7 @@ def print_attack_surface(results):
     emails    = results.get("emails",[])
 
     # ── Live Subdomains ────────────────────────────────
-    # ── Live Subdomains — show ALL critical and medium ──
+    # ── Live Subdomains ────────────────────────────────
     if live or takeovers:
         console.print("  [bold bright_green]Live Subdomains[/]")
         console.print()
@@ -806,17 +806,17 @@ def print_attack_surface(results):
                 if p <= 1 or s.get("status") == 404
             ]
 
-             console.print(
-                 f"  [dim]Total[/]  "
-                 f"[white]{len(live)}[/]  [dim]·[/]  "
-                 f"[red]{len(critical)} critical[/]  [dim]·[/]  "
-                 f"[yellow]{len(medium)} medium[/]  [dim]·[/]  "
-                 f"[dim]{len(standard)} standard[/]"
-             )
-             console.print()
+            console.print(
+                f"  [dim]Total[/]  "
+                f"[white]{len(live)}[/]  [dim]·[/]  "
+                f"[red]{len(critical)} critical[/]  [dim]·[/]  "
+                f"[yellow]{len(medium)} medium[/]  [dim]·[/]  "
+                f"[dim]{len(standard)} standard[/]"
+            )
+            console.print()
 
-             # show ALL critical — no cap
-             for s, tag, color, _ in critical:
+            # show ALL critical
+            for s, tag, color, _ in critical:
                 name   = s.get("subdomain","")
                 status = s.get("status","—")
                 title  = (s.get("title") or "")[:35]
@@ -832,33 +832,31 @@ def print_attack_surface(results):
                     + (f"  [dim]{title}[/]" if title else "")
                 )
 
-                # show ALL medium
-                for s, tag, color, _ in medium:
-                   name   = s.get("subdomain","")
-                   status = s.get("status","—")
-                   title  = (s.get("title") or "")[:35]
-                   st = (
-                     f"[bright_green]{status}[/]" if status == 200
-                     else f"[yellow]{status}[/]" if str(status).startswith("3")
-                     else f"[red]{status}[/]"    if status in [401,403]
-                     else f"[dim]{status}[/]"
-                   )
-                   console.print(
-                       f"  [yellow]·[/]  [white]{name}[/]  "
-                       f"[dim]{status}[/]  [{color}][{tag}][/{color}]"
-                       + (f"  [dim]{title}[/]" if title else "")
-                   )
+            # show ALL medium — separate loop, NOT nested in critical
+            for s, tag, color, _ in medium:
+                name   = s.get("subdomain","")
+                status = s.get("status","—")
+                title  = (s.get("title") or "")[:35]
+                st = (
+                    f"[bright_green]{status}[/]" if status == 200
+                    else f"[yellow]{status}[/]" if str(status).startswith("3")
+                    else f"[red]{status}[/]"    if status in [401,403]
+                    else f"[dim]{status}[/]"
+                )
+                console.print(
+                    f"  [yellow]·[/]  [white]{name}[/]  "
+                    f"{st}  [{color}][{tag}][/{color}]"
+                    + (f"  [dim]{title}[/]" if title else "")
+                )
 
-             # show standard — all of them, compact
-             if standard:
+            # show standard compact
+            if standard:
                 console.print()
                 console.print(f"  [dim]Standard ({len(standard)}):[/]")
                 for s, tag, color, _ in standard:
                     name   = s.get("subdomain","")
                     status = s.get("status","—")
-                    console.print(
-                        f"  [dim]  · {name}  {status}[/]"
-                    )
+                    console.print(f"  [dim]  · {name}  {status}[/]")
 
         console.print()
 
