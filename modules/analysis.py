@@ -532,7 +532,7 @@ VULN_HINT_RULES = [
     {
         "id":       "DNS-001",
         "title":    "Domain expires within 90 days",
-        "severity": "Medium",
+        "severity": "Info",
         "detail":   (
             "Domain expiry date is within 90 days. "
             "If not renewed, attacker could register it "
