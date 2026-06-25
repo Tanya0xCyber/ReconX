@@ -224,6 +224,8 @@ def tag_subdomain(name):
         return "Legacy",        "red",     2
     if any(x in n for x in ["mail","smtp","mx","webmail"]):
         return "Mail",          "bright_blue", 1
+    if any(x in n for x in ["login","signin","auth","sso","oauth","account"]):
+        return "Auth", "yellow", 2
     return "std", "dim", 0
 
 
@@ -348,14 +350,7 @@ def print_executive_summary(results, config, elapsed):
         f"{sev('Medium')} medium  "
         f"{sev('Low')} low[/]"
     )
-    if risk == "LOW" and (sev("Medium") > 0 or sev("Low") > 0):
-        console.print(
-           f"  [dim]          "
-           f"Header misconfigurations present — "
-           f"no critical attack surface found[/]"
-        )
-    console.print()
-
+    
     # ── Top Findings ──────────────────────────────────
     if hints:
         ordered = sorted(
@@ -429,6 +424,8 @@ def print_executive_summary(results, config, elapsed):
         console.print()
 
         for h in ordered[:6]:
+            if h.get("severity") == "Info":
+                continue
             sev_s = h.get("severity","Info")
             hid   = h.get("id","")
             conf  = confidence_map.get(hid,"Medium")
@@ -555,7 +552,7 @@ def print_executive_summary(results, config, elapsed):
             console.print(f"  [dim]    -  {f}[/]")
         console.print()
 
-    if not high_f and not medium_f:
+    if not high_f and not medium_f and not low_f:
         console.print(
             "  [dim]-  No automated shortcuts found[/]\n"
             "  [dim]-  Manual testing: auth flows, IDOR, business logic[/]"
@@ -728,6 +725,7 @@ def print_target_info(results, config):
                 console.print(
                     f"  [{color}]>[/{color}]  [white]{name}[/]  "
                     f"[{color}][{tag}][/{color}]"
+                    "[dim](cert log — not verified live)[/]"
                 )
         if len(subs) > 5:
             console.print(f"  [dim]  + {len(subs)-5} more in report[/]")
@@ -856,7 +854,10 @@ def print_attack_surface(results):
                 for s, tag, color, _ in standard:
                     name   = s.get("subdomain","")
                     status = s.get("status","—")
-                    console.print(f"  [dim]  · {name}  {status}[/]")
+                    if status == 404:
+                        console.print(f"  [dim]  · {name}  404  (resolves, no content)[/]")
+                    else:
+                        console.print(f"  [dim]  · {name}  {status}[/]")
 
         console.print()
 
@@ -881,66 +882,73 @@ def print_attack_surface(results):
                 web_ports.append((p, label or p.get("service",""), opp))
             else:
                 std_ports.append(p)
-
-        if crit_ports:
-            console.print("  [dim]Critical:[/]")
-            for p, label, opp in crit_ports:
-                host = p.get("host","")
-                num  = p.get("port","")
-                b = next(
-                    (x for x in banners
-                     if x.get("port")==num and x.get("host")==host),
-                    None
-                )
-                ver = f"  [dim]{b['version']}[/]" if b and b.get("version") else ""
-                console.print(
-                    f"  [red]>[/]  [white]{host}:{num}[/]  "
-                    f"[red]{label}[/]{ver}  "
-                    f"[dim]{opp}[/]"
-                )
-
-        if high_ports:
-            console.print("  [dim]High risk:[/]")
-            for p, label, opp in high_ports[:5]:
-                console.print(
-                    f"  [yellow]>[/]  "
-                    f"[white]{p.get('host','')}:{p.get('port','')}[/]  "
-                    f"[yellow]{label}[/]  [dim]{opp}[/]"
-                )
-        # uncommon web ports
+         
         unusual = [
             (p, label, opp) for p, label, opp in web_ports
             if p.get("port","") not in {80,443}
-        ]    
-        # uncommon web ports
-        if unusual:
-            console.print("  [bright_blue]Uncommon web ports:[/]")
-            for p, label, opp in unusual[:4]:
-                # p is the port dict, not a nested tuple
-                host = p.get("host","") 
-                num  = p.get("port","") 
-                console.print(
-                    f"  [bright_blue]·[/]  "
-                    f"[white]{host}:{num}[/]  "
-                    f"[dim]{label}[/]"
-                )
+        ]
+
+        # only print header if there's something interesting
+        has_interesting = bool(crit_ports or high_ports or unusual)
+
+        if has_interesting:
+            console.print("  [bold bright_green]Open Ports[/]")
             console.print()
 
-        # standard — just the count and port numbers
+            if crit_ports:
+                console.print("  [dim]Critical:[/]")
+                for p, label, opp in crit_ports:
+                    host = p.get("host","")
+                    num  = p.get("port","")
+                    b = next(
+                        (x for x in banners
+                         if x.get("port")==num and x.get("host")==host),
+                        None
+                    )
+                    ver = (
+                        f"  [dim]{b['version']}[/]"
+                        if b and b.get("version") else ""
+                    )
+                    console.print(
+                        f"  [red]>[/]  [white]{host}:{num}[/]  "
+                        f"[red]{label}[/]{ver}  [dim]{opp}[/]"
+                    )
+                console.print()
+
+            if high_ports:
+                console.print("  [dim]High risk:[/]")
+                for p, label, opp in high_ports:
+                    console.print(
+                        f"  [yellow]>[/]  "
+                        f"[white]{p.get('host','')}:{p.get('port','')}[/]  "
+                        f"[yellow]{label}[/]  [dim]{opp}[/]"
+                    )
+                console.print()
+
+            if unusual:
+                console.print("  [dim]Uncommon web ports:[/]")
+                for p, label, opp in unusual:
+                    console.print(
+                        f"  [bright_blue]·[/]  "
+                        f"[white]{p.get('host','')}:"
+                        f"{p.get('port','')}[/]  "
+                        f"[dim]{label}[/]"
+                    )
+                console.print()
+
+        # standard ports always shown — but compact, no header
         std_nums = sorted(set(
-             str(p.get("port","")) for p, label, opp in web_ports
-             if p.get("port","") in {80,443}
+            str(p.get("port","")) for p, label, opp in web_ports
+            if p.get("port","") in {80,443}
         ) | set(
-           str(p.get("port","")) for p in std_ports
+            str(p.get("port","")) for p in std_ports
         ), key=lambda x: int(x) if x.isdigit() else 0)
 
         if std_nums:
             console.print(
-                f"\n  [dim]Standard:  {' · '.join(std_nums)}[/]"
+                f"  [dim]Ports scanned:  {' · '.join(std_nums)}[/]"
             )
-        console.print()
-    else :
-        pass 
+            console.print()
     # ── APIs ──────────────────────────────────────────
     api_subs = [
         s for s in (
@@ -1319,11 +1327,7 @@ def print_tech_fingerprinting(results):
                 f"[{conf_clr}][{conf}][/{conf_clr}]  "
                 f"[dim]{evidence}[/]"
             )
-            if attack:
-                console.print(
-                    f"  [dim]             Testing focus: {attack}[/]"
-                )
-
+            
     # anything not in categories and not CDN
     for t in tech:
         if t not in shown and t not in cdn_tech_names:
@@ -1473,8 +1477,7 @@ def print_findings(results):
         )
         console.print()
 
-    console.print()
-
+    
 
 # ══════════════════════════════════════════════════════
 #  SECTION 6 — RECOMMENDED NEXT TESTS
@@ -1576,6 +1579,17 @@ def print_next_tests(results, config):
             f"check: crt.sh history, SPF includes, "
             f"old DNS records, email headers"
         ))
+    has_expiry = any(
+        "expires" in h.get("title","").lower()
+        for h in hints
+    )
+    if has_expiry:
+        steps.append((
+             "bright_blue", "Domain Renewal Check",
+             "Domain expires soon — confirm renewal is scheduled, "
+             "verify registrar lock is enabled"
+        ))    
+        
 
     # priority 5 — subdomains
     if interesting_subs:
@@ -1598,7 +1612,14 @@ def print_next_tests(results, config):
             f"No DMARC — test with swaks: "
             f"swaks --to target --from spoof@{config['target']}"
         ))
-
+    # In print_next_tests():
+    if "Nginx" in tech:
+        steps.append((
+            "dim", "Nginx Configuration Review",
+            "Check alias path traversal: "
+            "test /static../etc/passwd — "
+            "verify proxy_pass header handling"
+    ))
     # priority 7 — CMS
     if "WordPress" in tech:
         steps.append((
@@ -1613,8 +1634,22 @@ def print_next_tests(results, config):
             "Check Drupalgeddon2 (CVE-2018-7600) — "
             "verify patched version"
         ))
+    # always ensure minimum 2 useful tests
+    if len(steps) < 2:
+        steps.append((
+            "dim", "Manual Application Review",
+            "Browse application — map auth flows, "
+            "identify user roles, test session management"
+        ))
 
-    # default — clean target
+    if len(steps) < 3:
+        steps.append((
+            "dim", "Information Disclosure",
+            "Check /.well-known/security.txt, "
+            "robots.txt, sitemap.xml, error pages"
+        ))
+
+    # full default only if literally nothing found
     if not steps:
         steps = [
             ("dim", "Manual Browse",
