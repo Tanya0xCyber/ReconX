@@ -54,16 +54,21 @@ def print_banner():
     console.print()
 
     # info line under art
+    console.print("  [bold white]Automated Reconnaissance Framework[/]")
+    console.print()
+
     console.print(
-        "  [dim white]recon pipeline[/]  [bright_green]·[/]  "
-        "[dim white]bug bounty[/]  [bright_green]·[/]  "
-        "[dim white]pentest[/]  [bright_green]·[/]"
-         "\n"
-        " [dim] Tanya singh[/]"
+       "  [dim]recon pipeline[/]  "
+       "[green]•[/]  "
+       "[dim]attack surface[/]  "
+       "[green]•[/]  "
+       "[dim]pentest[/]"
     )
-    console.print(
-        "  [dim]" + "─" * 58 + "[/]"
-    )
+
+    console.print("  [dim]Author :[/] Tanya Singh")
+    console.print("  [dim]Version:[/] v1.0")
+
+    console.print("[green]" + "─"*62 + "[/]")
     console.print()
 
 
@@ -729,7 +734,7 @@ def print_target_info(results, config):
                 console.print(
                     f"  [{color}]>[/{color}]  [white]{name}[/]  "
                     f"[{color}][{tag}][/{color}]"
-                    "[dim](cert log — not verified live)[/]"
+                    f"[dim](cert log — not verified live)[/]"
                 )
         if len(subs) > 5:
             console.print(f"  [dim]  + {len(subs)-5} more in report[/]")
@@ -1056,10 +1061,9 @@ def print_attack_surface(results):
             return "Password endpoint"
         return "Sensitive path"
         
-    if endpoints:
-        console.print("  [bold bright_green]Discovered Endpoints[/]")
-        console.print()
-    
+    console.print("  [bold bright_green]Sensitive Endpoints[/]")
+    console.print()
+
     sens_eps = [
         e for e in endpoints
         if any(x in e.lower()
@@ -1072,6 +1076,8 @@ def print_attack_surface(results):
                for x in ["auth","login","token","oauth",
                           "password","reset","register"])
         and e not in sens_eps
+    ]
+
     ]
     api_eps = [
         e for e in endpoints
