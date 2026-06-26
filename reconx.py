@@ -426,27 +426,17 @@ def print_executive_summary(results, config, elapsed):
                 continue
             sev_s = h.get("severity","Info")
             hid   = h.get("id","")
-            conf  = confidence_map.get(hid,"Medium")
 
-            sev_clr  = {
+            sev_clr = {
                 "Critical":"red","High":"yellow",
                 "Medium":"bright_blue","Low":"dim"
             }.get(sev_s,"dim")
-            conf_clr = {
-                "High":"bright_green","Medium":"yellow","Low":"dim"
-            }.get(conf,"dim")
 
             console.print(
-                f"  [{sev_clr}][{sev_s}][/{sev_clr}]"
-                f"  [{conf_clr}][{conf} confidence][/{conf_clr}]"
-                f"  [white]{h.get('title','')}[/]"
+                f"  [{sev_clr}][{sev_s}][/{sev_clr}]  "
+                f"[white]{h.get('title','')}[/]"
             )
-            imp = impact_map.get(hid,"")
-            ev  = evidence_map.get(hid,"automated detection")
-            if imp:
-                console.print(f"  [dim]           Impact:   {imp}[/]")
-            console.print(f"  [dim]           Evidence: {ev}[/]")
-            console.print()
+        console.print()
 
     else:
         console.print(
@@ -779,8 +769,6 @@ def print_attack_surface(results):
     ports     = results.get("open_ports",[])
     banners   = results.get("banners",[])
     http      = results.get("http_services",[])
-    if not http:
-        console.print("  [dim]DEBUG: http_services is empty[/]")
     endpoints = results.get("js_endpoints",[])
     emails    = results.get("emails",[])
 
@@ -878,111 +866,120 @@ def print_attack_surface(results):
         console.print()
 
     # ── Open Ports ─────────────────────────────────────
-    if ports:
-        console.print("  [bold bright_green]Open Ports[/]")
+    # ── Open Ports ─────────────────────────────────────
+    console.print("  [bold bright_green]Open Ports[/]")
+    console.print()
+
+    if not ports:
+        console.print("  [dim]  no ports scanned[/]")
         console.print()
-        
-        web_ports  = []
-        crit_ports = []
-        high_ports = []
-        std_ports  = []
-
-        for p in ports:
-            num = p.get("port","")
-            label, risk, opp = port_intel(num)
-            if risk == "crit":
-                crit_ports.append((p, label, opp))
-            elif risk == "high":
-                high_ports.append((p, label, opp))
-            elif num in {80,443,8080,8443,8000,8888,3000}:
-                web_ports.append((p, label or p.get("service",""), opp))
-            else:
-                std_ports.append(p)
-                
-        unusual = [
-            (p, label, opp) for p, label, opp in web_ports
-            if p.get("port","") not in {80,443}
-        ]
-        
-
-        # only print header if there's something interesting
-        has_interesting = bool(crit_ports or high_ports or unusual)
-
-        if has_interesting:
-            console.print("  [bold bright_green]Open Ports[/]")
-            console.print()
-
-            if crit_ports:
-                console.print("  [dim]Critical:[/]")
-                for p, label, opp in crit_ports:
-                    host = p.get("host","")
-                    num  = p.get("port","")
-                    b = next(
-                      (x for x in banners
-                       if x.get("port")==num and x.get("host")==host),
-                       None
-                    )
-                    ver = f"  [dim]{b['version']}[/]" if b and b.get("version") else ""
-                    console.print(
-                       f"  [red]▸[/]  [bold white]{host}:{num}[/]  "
-                       f"[red]{label or p.get('service','')}[/]{ver}"
-                    )
-                    if opp:
-                       console.print(f"  [dim]     {opp}[/]")
-            console.print()
-            if high_ports:
-                console.print(f"  [bold yellow]High Risk Ports  ({len(high_ports)})[/]")
-                console.print()
-                for p, label, opp in high_ports[:6]:
-                    host = p.get("host","")
-                    num  = p.get("port","")
-                    console.print(
-                       f"  [yellow]▸[/]  [white]{host}:{num}[/]  "
-                       f"[yellow]{label or p.get('service','')}[/]  "
-                       f"[dim]{opp or ''}[/]"
-                    )
-                console.print()
-            if unusual:
-                console.print("  [dim]Uncommon web ports:[/]")
-                for p, label, opp in unusual:
-                    console.print(
-                        f"  [bright_blue]·[/]  "
-                        f"[white]{p.get('host','')}:"
-                        f"{p.get('port','')}[/]  "
-                        f"[dim]{label}[/]"
-                    )
-                console.print()
-
-        # standard ports always shown — but compact, no header
-        std_nums = sorted(set(
-            str(p.get("port","")) for p, label, opp in web_ports
-            if p.get("port","") in {80,443}
-        ) | set(
-            str(p.get("port","")) for p in std_ports
-        ), key=lambda x: int(x) if x.isdigit() else 0)
-
-        PORT_LABELS = {
-            "80":   "HTTP",
-            "443":  "HTTPS",
-            "8080": "HTTP-Alt",
-            "8443": "HTTPS-Alt",
-            "8000": "HTTP-Dev",
-            "3000": "Node/Dev",
-            "8888": "HTTP-Dev",
+    else:
+        PORT_INFO = {
+            21:    ("FTP",          "high", "anon login / cleartext creds"),
+            22:    ("SSH",          "med",  "brute-force / key reuse"),
+            23:    ("Telnet",       "crit", "creds in cleartext"),
+            25:    ("SMTP",         "med",  "mail relay / enumeration"),
+            53:    ("DNS",          "med",  "zone transfer possible"),
+            80:    ("HTTP",         "std",  ""),
+            443:   ("HTTPS",        "std",  ""),
+            445:   ("SMB",          "high", "EternalBlue / file share"),
+            3306:  ("MySQL",        "high", "brute-force -> data exfil"),
+            3389:  ("RDP",          "crit", "ransomware entry / BlueKeep"),
+            5432:  ("PostgreSQL",   "high", "brute-force -> SQL pivot"),
+            5900:  ("VNC",          "crit", "often no auth"),
+            6379:  ("Redis",        "crit", "no auth -> RCE"),
+            8080:  ("HTTP-Alt",     "med",  "dev server / less hardened"),
+            8443:  ("HTTPS-Alt",    "med",  "alt HTTPS"),
+            8000:  ("HTTP-Dev",     "med",  "dev server"),
+            8888:  ("HTTP-Dev",     "crit", "Jupyter — often no auth"),
+            9090:  ("Prometheus",   "med",  "metrics leak infra details"),
+            9200:  ("Elasticsearch","crit", "no auth -> read/write all"),
+            27017: ("MongoDB",      "crit", "no auth -> full DB dump"),
+            2375:  ("Docker API",   "crit", "mount host fs -> takeover"),
+            6443:  ("K8s API",      "crit", "cluster takeover"),
+            3000:  ("Node/Dev",     "med",  "dev server"),
+            4848:  ("GlassFish",    "high", "default admin:adminadmin"),
+            8161:  ("ActiveMQ",     "high", "default admin:admin"),
+            15672: ("RabbitMQ",     "high", "default guest:guest"),
+            389:   ("LDAP",         "high", "directory enum / cred attacks"),
+            11211: ("Memcached",    "high", "amplification / data exposure"),
         }
 
-        if std_nums:
-            labeled = [
-                f"{p}/tcp {PORT_LABELS[p]}"
-                if p in PORT_LABELS else f"{p}/tcp"
-                for p in std_nums
-            ]
-            console.print(
-                f"  [dim]Ports scanned:  "
-                f"{' · '.join(labeled)}[/]"
-            )
+        # deduplicate by port number
+        seen_ports = set()
+        deduped = []
+        for p in ports:
+            num = p.get("port","")
+            if num not in seen_ports:
+                seen_ports.add(num)
+                deduped.append(p)
+
+        crit_lines = []
+        high_lines = []
+        med_lines  = []
+        std_lines  = []
+
+        for p in deduped:
+            num  = p.get("port","")
+            host = p.get("host","")
+            info = PORT_INFO.get(num)
+            svc  = info[0] if info else (p.get("service","") or "unknown")
+            risk = info[1] if info else "std"
+            opp  = info[2] if info else ""
+
+            entry = (num, host, svc, risk, opp)
+            if risk == "crit":
+                crit_lines.append(entry)
+            elif risk == "high":
+                high_lines.append(entry)
+            elif risk == "med":
+                med_lines.append(entry)
+            else:
+                std_lines.append(entry)
+
+        if crit_lines:
+            for num, host, svc, risk, opp in crit_lines:
+                console.print(
+                    f"  [red]{num}/tcp[/]  "
+                    f"[red]open[/]  "
+                    f"[bold white]{svc}[/]  "
+                    f"[dim]{host}[/]"
+                )
+                if opp:
+                    console.print(f"  [dim]           -> {opp}[/]")
             console.print()
-            
+
+        if high_lines:
+            for num, host, svc, risk, opp in high_lines:
+                console.print(
+                    f"  [yellow]{num}/tcp[/]  "
+                    f"[yellow]open[/]  "
+                    f"[white]{svc}[/]  "
+                    f"[dim]{host}[/]"
+                )
+                if opp:
+                    console.print(f"  [dim]           -> {opp}[/]")
+            console.print()
+
+        if med_lines:
+            for num, host, svc, risk, opp in med_lines:
+                console.print(
+                    f"  [bright_blue]{num}/tcp[/]  "
+                    f"[bright_blue]open[/]  "
+                    f"[white]{svc}[/]  "
+                    f"[dim]{host}[/]"
+                )
+                if opp:
+                    console.print(f"  [dim]           -> {opp}[/]")
+            console.print()
+
+        if std_lines:
+            std_fmt = [
+                f"[dim]{num}/tcp {svc}[/]"
+                for num, host, svc, risk, opp in std_lines
+            ]
+            console.print("  " + "  ·  ".join(std_fmt))
+            console.print()
     # ── APIs ──────────────────────────────────────────
    
     api_endpoints = [
@@ -997,39 +994,42 @@ def print_attack_surface(results):
         console.print("  [bold bright_green]API Endpoints[/]")
         console.print()
         for e in api_endpoints:
-             console.print(f"  [yellow]>[/]  [white]{e}[/]")
+            console.print(f"  [yellow]>[/]  [white]{e}[/]")
         console.print()
 
    
 
-        console.print()
         
     # ── Login Pages ────────────────────────────────────
+    console.print("  [bold bright_green]Login Pages[/]")
+    console.print()
     login_pages = [
         s for s in http
         if s.get("is_login") and not s.get("is_admin")
     ]
     if login_pages:
-        console.print("  [bold bright_green]Login Pages[/]")
-        console.print()
-        for s in login_pages[:4]:
+        for s in login_pages:
             console.print(
                 f"  [yellow]>[/]  [white]{s.get('url','')}[/]  "
                 f"[dim]{s.get('status','')}[/]"
             )
-        console.print()
-
+    else:
+        console.print("  [dim]  none detected[/]")
+    console.print()
+    
     # ── Admin Pages ────────────────────────────────────
+    console.print("  [bold bright_green]Admin Pages[/]")
+    console.print()
     admin_pages = [s for s in http if s.get("is_admin")]
     if admin_pages:
-        console.print("  [bold bright_green]Admin Pages[/]")
-        console.print()
-        for s in admin_pages[:4]:
+        for s in admin_pages:
             console.print(
                 f"  [red]>[/]  [white]{s.get('url','')}[/]  "
                 f"[dim]{s.get('status','')}[/]"
             )
-        console.print()
+    else:
+        console.print("  [dim]  none detected[/]")
+    console.print()
 
     # ── Sensitive Endpoints ────────────────────────────
     def endpoint_label(path):
@@ -1736,11 +1736,21 @@ def main():
 
     results.update(validation)
 
+    raw_srv = validation.get("server","?")
+    cdn_vals = {
+        "cloudflare","fastly","cloudfront",
+        "vercel","netlify","akamai","github.com"
+    }
+    srv_display = (
+        "CDN (real server hidden)"
+        if any(c in raw_srv.lower() for c in cdn_vals)
+        else raw_srv
+    )
     console.print(
         f"  [bright_green]+[/]  "
         f"[bold white]{config['target']}[/]  "
         f"[dim]->[/]  [white]{validation.get('ip','?')}[/]  "
-        f"[dim]server[/] [white]{validation.get('server','?')}[/]  "
+        f"[dim]server[/] [white]{srv_display}[/]  "
         f"[dim]https[/] "
         + ("[bright_green]yes[/]"
            if validation.get("https") else "[red]no[/]")
