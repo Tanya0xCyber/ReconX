@@ -308,7 +308,13 @@ def print_section_rule(title):
 
 def print_executive_summary(results, config, elapsed):
 
-    section("Executive Summary")
+    def section(title):
+        console.print()
+        console.rule(
+           f"[bold bright_green]{title}[/]",
+           style="green"
+        )
+    console.print()
 
     hints      = results.get("vuln_hints", [])
     secrets    = results.get("js_secrets", [])
@@ -767,6 +773,12 @@ def print_target_info(results, config):
 def print_attack_surface(results):
 
     section("Attack Surface")
+    console.print(
+        Table.grid(
+           padding=(0,4)
+        )
+    )
+    
 
     bf        = results.get("subdomain_bruteforce",{})
     live      = bf.get("live",[])
@@ -1752,19 +1764,18 @@ def main():
         if any(c in raw_srv.lower() for c in cdn_vals)
         else raw_srv
     )
-    console.print(f"  [bold bright_green]Target[/] : [bold white]{config['target']}[/]")
     console.print(
-        f"  [dim]IP[/]      [white]{validation.get('ip','?')}[/]   "
-        f"[dim]HTTPS[/] "
-        + ("[bright_green]Yes[/]" if validation.get("https") else "[red]No[/]")
+        Panel.fit(
+           f"[bold white]Target[/]   : {config['target']}\n"
+           f"[bold white]IP[/]       : {validation.get('ip','?')}\n"
+           f"[bold white]HTTPS[/]    : "
+           f"{'[bright_green]Yes[/]' if validation.get('https') else '[red]No[/]'}\n"
+           f"[bold white]Server[/]   : {srv_display}",
+           border_style="green",
+           padding=(0,2),
+           title="[bold green]Recon[/]"
+        )
     )
-
-    console.print(
-        f"  [dim]Server[/]  [white]{srv_display}[/]"
-    )
-
-    console.print("[green]" + "─"*70 + "[/]")
-    console.print()
 
     # ── run all stages silently ────────────────────────
     try:
@@ -1788,13 +1799,13 @@ def main():
         console.print("\n  [yellow]!  interrupted[/]\n")
 
     elapsed = time.time() - total_start
-    console.print("[green]" + "─"*70 + "[/]")
     console.print(
-        f"  [bold bright_green]Recon Completed[/]  "
-        f"[dim]in[/] [white]{round(elapsed,1)}s[/]"
+        f"[bold bright_green]Recon Completed[/]  "
+        f"[dim]in[/] "
+        f"[white]{round(elapsed,1)}s[/]"
     )
-    console.print("[green]" + "─"*70 + "[/]")
-    console.print()
+
+    console.rule(style="green")
 
     # ── save report silently ───────────────────────────
     report_path = None
