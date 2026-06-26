@@ -68,7 +68,7 @@ def print_banner():
     console.print("  [dim]Author :[/] Tanya Singh")
     console.print("  [dim]Version:[/] v1.0")
 
-    console.print("[green]" + "─"*62 + "[/]")
+    console.print("[green]" + "="*90 + "[/]")
     console.print()
 
 
@@ -1752,15 +1752,18 @@ def main():
         if any(c in raw_srv.lower() for c in cdn_vals)
         else raw_srv
     )
+    console.print(f"  [bold bright_green]Target[/] : [bold white]{config['target']}[/]")
     console.print(
-        f"  [bright_green]+[/]  "
-        f"[bold white]{config['target']}[/]  "
-        f"[dim]->[/]  [white]{validation.get('ip','?')}[/]  "
-        f"[dim]server[/] [white]{srv_display}[/]  "
-        f"[dim]https[/] "
-        + ("[bright_green]yes[/]"
-           if validation.get("https") else "[red]no[/]")
+        f"  [dim]IP[/]      [white]{validation.get('ip','?')}[/]   "
+        f"[dim]HTTPS[/] "
+        + ("[bright_green]Yes[/]" if validation.get("https") else "[red]No[/]")
     )
+
+    console.print(
+        f"  [dim]Server[/]  [white]{srv_display}[/]"
+    )
+
+    console.print("[green]" + "─"*70 + "[/]")
     console.print()
 
     # ── run all stages silently ────────────────────────
@@ -1785,11 +1788,12 @@ def main():
         console.print("\n  [yellow]!  interrupted[/]\n")
 
     elapsed = time.time() - total_start
+    console.print("[green]" + "─"*70 + "[/]")
     console.print(
-        f"  [bright_green]+[/]  "
-        f"[dim]Recon completed  ·  "
-        f"Duration: {round(elapsed,1)}s[/]"
+        f"  [bold bright_green]Recon Completed[/]  "
+        f"[dim]in[/] [white]{round(elapsed,1)}s[/]"
     )
+    console.print("[green]" + "─"*70 + "[/]")
     console.print()
 
     # ── save report silently ───────────────────────────
@@ -1811,12 +1815,19 @@ def main():
         print_next_tests(results, config)
 
     # single footer line
+    console.print("[green]" + "="*90 + "[/]")
     console.print(
-         f"  [dim]done  ·  {config['target']}  ·  "
-         f"{round(elapsed,1)}s"
-         + (f"  ·  report -> {report_path}" if report_path else "")
-         + "[/]\n"
+        f"[bold bright_green]Scan Finished[/]  "
+        f"[white]{config['target']}[/]"
     )
+
+    if report_path:
+        console.print(
+            f"[dim]Report:[/] [white]{report_path}[/]"
+        )
+
+    console.print("[green]" + "="*90 + "[/]")
+    console.print()
 
 if __name__ == "__main__":
     main()
