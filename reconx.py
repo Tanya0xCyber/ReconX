@@ -1078,7 +1078,7 @@ def print_attack_surface(results):
         and e not in sens_eps
     ]
 
-    ]
+    
     api_eps = [
         e for e in endpoints
         if ("/api/" in e.lower()
