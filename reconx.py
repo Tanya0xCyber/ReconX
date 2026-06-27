@@ -65,8 +65,9 @@ def print_banner():
        "[dim]pentest[/]"
     )
 
-    console.print("  [dim]Author :[/] Tanya Singh")
-    console.print("  [dim]Version:[/] v1.0")
+    console.print("  [dim]Author :[/] Tanya Singh" 
+        "[green]|[/]  "
+        "[dim]Version:[/] v1.0")
 
     console.print("[green]" + "="*90 + "[/]")
     console.print()
@@ -773,12 +774,7 @@ def print_target_info(results, config):
 def print_attack_surface(results):
 
     section("Attack Surface")
-    console.print(
-        Table.grid(
-           padding=(0,4)
-        )
-    )
-    
+     
 
     bf        = results.get("subdomain_bruteforce",{})
     live      = bf.get("live",[])
