@@ -987,7 +987,7 @@ def print_attack_surface(results):
             console.print("  " + "  ·  ".join(std_fmt))
             console.print()
     # ── APIs ──────────────────────────────────────────
-       api_endpoints = [
+    api_endpoints = [
         e for e in endpoints
         if "/api/" in e.lower()
         or e.lower().startswith("/v1")
