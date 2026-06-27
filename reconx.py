@@ -309,14 +309,6 @@ def print_section_rule(title):
 
 def print_executive_summary(results, config, elapsed):
 
-    def section(title):
-        console.print()
-        console.rule(
-           f"[bold bright_green]{title}[/]",
-           style="green"
-        )
-    console.print()
-
     hints      = results.get("vuln_hints", [])
     secrets    = results.get("js_secrets", [])
     takeovers  = results.get("takeovers", [])
@@ -785,27 +777,7 @@ def print_attack_surface(results):
     endpoints = results.get("js_endpoints",[])
     emails    = results.get("emails",[])
 
-    summary = Table.grid(padding=(0, 4))
-
-    summary.add_column(style="bold white")
-    summary.add_column(style="bright_green")
-
-    summary.add_row("Subdomains", str(len(live)))
-    summary.add_row("Open Ports", str(len(ports)))
-
-    login_pages = [
-       s for s in http
-       if s.get("is_login") and not s.get("is_admin")
-    ]
-    admin_pages = [s for s in http if s.get("is_admin")]
-
-    summary.add_row("Login Pages", str(len(login_pages)))
-    summary.add_row("Admin Pages", str(len(admin_pages)))
-    summary.add_row("Emails", str(len(emails)))
-    summary.add_row("API Endpoints", str(len(api_endpoints)))
-
-    console.print(summary)
-    console.print()
+   
     # ── Live Subdomains ────────────────────────────────
     # ── Live Subdomains ────────────────────────────────
     if live or takeovers:
@@ -1015,8 +987,7 @@ def print_attack_surface(results):
             console.print("  " + "  ·  ".join(std_fmt))
             console.print()
     # ── APIs ──────────────────────────────────────────
-   
-    api_endpoints = [
+       api_endpoints = [
         e for e in endpoints
         if "/api/" in e.lower()
         or e.lower().startswith("/v1")
@@ -1030,12 +1001,8 @@ def print_attack_surface(results):
         for e in api_endpoints:
             console.print(f"  [yellow]>[/]  [white]{e}[/]")
         console.print()
-
-   
-
-        
+       
     # ── Login Pages ────────────────────────────────────
-        
     console.print("  [bold bright_green]Login Pages[/]")
     console.print()
     login_pages = [
