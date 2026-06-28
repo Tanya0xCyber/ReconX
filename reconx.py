@@ -353,17 +353,23 @@ def print_executive_summary(results, config, elapsed):
         risk, risk_clr = "LOW",    "bright_green"
 
     # ── Risk ──────────────────────────────────────────
-    console.print(f"  [cyan]Risk Level[/]")
-    console.print()
     console.print(
-        f"  [bold {risk_clr}]  {risk}  [/]  "
-        f"[dim]·  "
-        f"[red]{sev('Critical')} critical[/dim]  "
-        f"[yellow]{sev('High')} high[/]  "
-        f"[bright_blue]{sev('Medium')} medium[/]  "
-        f"[dim]{sev('Low')} low[/]"
+       f"[cyan]Overall Risk[/] : "
+       f"[bold {risk_clr}]{risk}[/]"
     )
     console.print()
+    console.print(
+       f"[cyan]Critical[/] : [white]{sev('Critical')}[/]"
+    )
+    console.print(
+       f"[cyan]High[/]     : [white]{sev('High')}[/]"
+    )
+    console.print(
+       f"[cyan]Medium[/]   : [white]{sev('Medium')}[/]"
+    )
+    console.print(
+       f"[cyan]Low[/]      : [white]{sev('Low')}[/]"
+    )
     
     # ── Top Findings ──────────────────────────────────
     console.print(
@@ -451,6 +457,10 @@ def print_executive_summary(results, config, elapsed):
             )
             t.add_column("sev",   width=10)
             t.add_column("title", style="white")
+            t.add_row(
+               f"[{sev_clr}]{sev_s}[/{sev_clr}]",
+               h.get("title","")
+            )
        
         for h in ordered[:6]:
             if h.get("severity") == "Info":
