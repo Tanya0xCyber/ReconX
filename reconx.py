@@ -312,7 +312,7 @@ def subsection(title):
 # ══════════════════════════════════════════════════════
 
 def print_executive_summary(results, config, elapsed):
-
+    section("Executive Summary")
     hints      = results.get("vuln_hints", [])
     secrets    = results.get("js_secrets", [])
     takeovers  = results.get("takeovers", [])
@@ -366,7 +366,9 @@ def print_executive_summary(results, config, elapsed):
     console.print()
     
     # ── Top Findings ──────────────────────────────────
-    console.rule("[dim]Top Findings[/]", style="dim green")
+    console.print(
+       "[bold bright_green]Top Findings[/]"
+    )
     console.print()
     if hints:
         ordered = sorted(
@@ -438,6 +440,7 @@ def print_executive_summary(results, config, elapsed):
         }
         console.print()
         
+        
         if has_real:
             # table for findings
             t = Table(
@@ -470,9 +473,10 @@ def print_executive_summary(results, config, elapsed):
         console.print()
 
     # ── Recommended Testing Focus ──────────────────────
-    console.rule("[dim]Recommended Testing Focus[/]", style="dim green")
+    console.print(
+        "[bold bright_green]Recommended Testing Focus[/]"
+    )
     console.print()
-
     tech      = results.get("tech_stack",[])
     endpoints = results.get("js_endpoints",[])
     emails    = results.get("emails",[])
@@ -841,9 +845,7 @@ def print_attack_surface(results):
     http      = results.get("http_services",[])
     endpoints = results.get("js_endpoints",[])
     emails    = results.get("emails",[])
-
    
-    # ── Live Subdomains ────────────────────────────────
     # ── Live Subdomains ────────────────────────────────
     if live or takeovers:
         console.print("  [bold bright_green]Live Subdomains[/]")
