@@ -354,22 +354,22 @@ def print_executive_summary(results, config, elapsed):
 
     # ── Risk ──────────────────────────────────────────
     console.print(
-       f"[cyan]Risk Assessment[/] : "
+       f"[bold_bright_green]Risk Assessment[/] : "
        f"[bold {risk_clr}]{risk}[/]"
     )
     console.print()
     console.print(
-       f"[cyan]Critical[/] : [white]{sev('Critical')}[/]"
+       f"[cyan]    Critical[/] : [white]{sev('Critical')}[/]"
     )
     console.print(
-       f"[cyan]High[/]     : [white]{sev('High')}[/]"
+       f"[cyan]    High[/]     : [white]{sev('High')}[/]"
     )
     console.print(
-       f"[cyan]Medium[/]   : [white]{sev('Medium')}[/]"
+       f"[cyan]    Medium[/]   : [white]{sev('Medium')}[/]"
     )
     console.print(
-       f"[cyan]Low[/]      : [white]{sev('Low')}[/]"
-    )
+       f"[cyan]   Low[/]      : [white]{sev('Low')}[/]"
+    ) 
     
     # ── Top Findings ──────────────────────────────────
     console.print(
