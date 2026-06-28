@@ -835,36 +835,6 @@ def print_target_info(results, config):
 #  Subdomains, Ports, APIs, Login/Admin, Endpoints,
 #  Emails , exposed files 
 # ══════════════════════════════════════════════════════
-def print_asset_table(title, columns, rows):
-    console.print()
-
-    console.print(f"[bold bright_green]{title}[/]")
-
-    table = Table(
-        show_header=True,
-        header_style="bright_cyan",
-        border_style="green",
-        expand=False,
-        pad_edge=False,
-        box=box.MINIMAL_DOUBLE_HEAD
-    )
-
-    table.add_column(columns[0], style="white", width=35)
-    table.add_column(columns[1], style="cyan", justify="center", width=8)
-    table.add_column(columns[2], style="yellow", justify="center", width=10)
-
-    if rows:
-        for row in rows:
-            table.add_row(*row)
-    else:
-        table.add_row(
-            *(
-                ["None detected"]
-                + [""] * (len(columns)-1)
-            )
-        )
-
-    console.print(table)
 def print_attack_surface(results):
 
     section("Attack Surface")
@@ -878,20 +848,11 @@ def print_attack_surface(results):
     emails    = results.get("emails",[])
    
     # ── Live Subdomains ────────────────────────────────
-    if live or takeovers:
-        rows = []
-        for s in live:
-          rows.append((
-            s.get("subdomain",""),
-            str(s.get("status","")),
-            tag_subdomain(s.get("subdomain",""))[0]
-          ))
-
-        print_asset_table(
-           "Subdomains",
-           ["Subdomain","Status","Tag"],
-        rows
-        )
+    console.print(
+       "[bright_cyan]◆[/] [bold bright_green] Live Subdomains [/]"
+    )
+    
+   
         
 
         if takeovers:
@@ -903,7 +864,6 @@ def print_attack_surface(results):
                     f"[dim]unclaimed external service[/]"
                 )
             console.print()
-
         if live:
             tagged = []
             for s in live:
