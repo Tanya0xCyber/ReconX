@@ -354,7 +354,7 @@ def print_executive_summary(results, config, elapsed):
 
     # ── Risk ──────────────────────────────────────────
     console.print(
-       f"[cyan]Overall Risk[/] : "
+       f"[cyan]Risk Assessment[/] : "
        f"[bold {risk_clr}]{risk}[/]"
     )
     console.print()
@@ -457,11 +457,7 @@ def print_executive_summary(results, config, elapsed):
             )
             t.add_column("sev",   width=10)
             t.add_column("title", style="white")
-            t.add_row(
-               f"[{sev_clr}]{sev_s}[/{sev_clr}]",
-               h.get("title","")
-            )
-       
+                   
         for h in ordered[:6]:
             if h.get("severity") == "Info":
                 continue
