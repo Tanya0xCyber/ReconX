@@ -372,7 +372,7 @@ def print_executive_summary(results, config, elapsed):
     
     # ── Top Findings ──────────────────────────────────
     console.print(
-      "[bright_cyan]◆[/] [bold bright_green]Top findings[/]")
+      "[bright_cyan]◆[/] [bold bright_green]Top findings[/]"
     )
     if hints:
         ordered = sorted(
