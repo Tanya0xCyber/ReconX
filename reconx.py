@@ -19,6 +19,7 @@ try:
     from rich.rule import Rule
     from rich.text import Text
     from rich.box import ROUNDED, SIMPLE_HEAVY, MINIMAL_DOUBLE_HEAD
+    from rich import box
 except ImportError:
     print("[!] Run: pip install rich")
     sys.exit(1)
@@ -867,8 +868,6 @@ def print_asset_table(title, columns, rows):
 def print_attack_surface(results):
 
     section("Attack Surface")
-     
-
     bf        = results.get("subdomain_bruteforce",{})
     live      = bf.get("live",[])
     takeovers = results.get("takeovers",[])
