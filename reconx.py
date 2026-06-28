@@ -354,28 +354,27 @@ def print_executive_summary(results, config, elapsed):
 
     # ── Risk ──────────────────────────────────────────
     console.print(
-       f"[bold_bright_green]Risk Assessment[/] : "
+       f"[bold bright_green][+][/bold bright_green] Risk Assessment[/] : "
        f"[bold {risk_clr}]{risk}[/]"
     )
     console.print()
     console.print(
-       f"[cyan]    Critical[/] : [white]{sev('Critical')}[/]"
+       f"[cyan]  Critical[/] : [white]{sev('Critical')}[/]"
     )
     console.print(
-       f"[cyan]    High[/]     : [white]{sev('High')}[/]"
+       f"[cyan]  High[/]     : [white]{sev('High')}[/]"
     )
     console.print(
-       f"[cyan]    Medium[/]   : [white]{sev('Medium')}[/]"
+       f"[cyan]  Medium[/]   : [white]{sev('Medium')}[/]"
     )
     console.print(
-       f"[cyan]   Low[/]      : [white]{sev('Low')}[/]"
+       f"[cyan]  Low[/]      : [white]{sev('Low')}[/]"
     ) 
     
     # ── Top Findings ──────────────────────────────────
     console.print(
-       "[bold bright_green]Top Findings[/]"
+       "[bold bright_green][+][/bold bright_green] Top Findings[/]"
     )
-    console.print()
     if hints:
         ordered = sorted(
             hints,
@@ -444,8 +443,7 @@ def print_executive_summary(results, config, elapsed):
             "ADM-001":"Medium","SUB-001":"Medium",
             "CVE-001":"Medium","TECH-001":"High","TECH-002":"High",
         }
-        console.print()
-        
+          
         
         if has_real:
             # table for findings
@@ -474,13 +472,14 @@ def print_executive_summary(results, config, elapsed):
             )
       
         console.print(t)
+        console.print()
     else:
         console.print( "  [dim]  No confirmed findings from automated scan.[/]" )
         console.print()
 
     # ── Recommended Testing Focus ──────────────────────
     console.print(
-        "[bold bright_green]Recommended Testing Focus[/]"
+        "[bold bright_green][+][/bold bright_green] Recommended Testing Focus[/]"
     )
     console.print()
     tech      = results.get("tech_stack",[])
