@@ -354,8 +354,7 @@ def print_executive_summary(results, config, elapsed):
 
     # ── Risk ──────────────────────────────────────────
     console.print(
-       f"[bold bright_green][+][/bold bright_green] Risk Assessment[/] : "
-       f"[bold {risk_clr}]{risk}[/]"
+       "[bright_cyan]◆[/] [bold bright_green] Risk Assessment[/]"
     )
     console.print()
     console.print(
@@ -373,7 +372,7 @@ def print_executive_summary(results, config, elapsed):
     
     # ── Top Findings ──────────────────────────────────
     console.print(
-       "[bold bright_green][+][/bold bright_green] Top Findings[/]"
+      "[bright_cyan]◆[/] [bold bright_green]Top findings[/]")
     )
     if hints:
         ordered = sorted(
@@ -479,7 +478,7 @@ def print_executive_summary(results, config, elapsed):
 
     # ── Recommended Testing Focus ──────────────────────
     console.print(
-        "[bold bright_green][+][/bold bright_green] Recommended Testing Focus[/]"
+       "[bright_cyan]◆[/] [bold bright_green] Recommended Testing Focus [/]")
     )
     console.print()
     tech      = results.get("tech_stack",[])
