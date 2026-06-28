@@ -478,7 +478,7 @@ def print_executive_summary(results, config, elapsed):
 
     # ── Recommended Testing Focus ──────────────────────
     console.print(
-       "[bright_cyan]◆[/] [bold bright_green] Recommended Testing Focus [/]")
+       "[bright_cyan]◆[/] [bold bright_green] Recommended Testing Focus [/]"
     )
     console.print()
     tech      = results.get("tech_stack",[])
