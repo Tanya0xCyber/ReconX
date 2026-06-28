@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-reconx.py — main entry point
-runs the full recon pipeline and shows results in terminal
+reconx.py —
 """
 
 import argparse
@@ -879,8 +878,20 @@ def print_attack_surface(results):
    
     # ── Live Subdomains ────────────────────────────────
     if live or takeovers:
-        console.print("[bright_cyan]▶[/] [bold bright_green]Live Subdomains[/]")
-        console.print()
+        rows = []
+        for s in live:
+          rows.append((
+            s.get("subdomain",""),
+            str(s.get("status","")),
+            tag_subdomain(s.get("subdomain",""))[0]
+          ))
+
+        print_asset_table(
+           "Subdomains",
+           ["Subdomain","Status","Tag"],
+        rows
+        )
+        
 
         if takeovers:
             for t in takeovers:
@@ -973,6 +984,20 @@ def print_attack_surface(results):
     # ── Open Ports ─────────────────────────────────────
     console.print("[bright_cyan]▶[/] [bold bright_green]Open Ports[/]")
     console.print()
+    rows = []
+
+    for p in deduped:
+       rows.append((
+           f"{p['port']}/tcp",
+           port_intel(p["port"])[0],
+           port_intel(p["port"])[2]
+       ))
+
+       print_asset_table(
+          "Open Ports",
+          ["Port","Service","Notes"],
+          rows
+       )
 
     if not ports:
         console.print("  [dim]  no ports scanned[/]")
