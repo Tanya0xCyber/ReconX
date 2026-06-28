@@ -843,12 +843,14 @@ def print_asset_table(title, columns, rows):
         show_header=True,
         header_style="bright_cyan",
         border_style="green",
-        expand=True,
-        pad_edge=False
+        expand=False,
+        pad_edge=False,
+        box=box.MINIMAL_DOUBLE_HEAD
     )
 
-    for c in columns:
-        table.add_column(c)
+    table.add_column(columns[0], style="white", width=35)
+    table.add_column(columns[1], style="cyan", justify="center", width=8)
+    table.add_column(columns[2], style="yellow", justify="center", width=10)
 
     if rows:
         for row in rows:
