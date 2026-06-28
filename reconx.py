@@ -835,7 +835,34 @@ def print_target_info(results, config):
 #  Subdomains, Ports, APIs, Login/Admin, Endpoints,
 #  Emails , exposed files 
 # ══════════════════════════════════════════════════════
+def print_asset_table(title, columns, rows):
+    console.print()
 
+    console.print(f"[bold bright_green]{title}[/]")
+
+    table = Table(
+        show_header=True,
+        header_style="bright_cyan",
+        border_style="green",
+        expand=True,
+        pad_edge=False
+    )
+
+    for c in columns:
+        table.add_column(c)
+
+    if rows:
+        for row in rows:
+            table.add_row(*row)
+    else:
+        table.add_row(
+            *(
+                ["None detected"]
+                + [""] * (len(columns)-1)
+            )
+        )
+
+    console.print(table)
 def print_attack_surface(results):
 
     section("Attack Surface")
@@ -852,7 +879,7 @@ def print_attack_surface(results):
    
     # ── Live Subdomains ────────────────────────────────
     if live or takeovers:
-        console.print("  [bold bright_green]Live Subdomains[/]")
+        console.print("[bright_cyan]▶[/] [bold bright_green]Live Subdomains[/]")
         console.print()
 
         if takeovers:
@@ -944,7 +971,7 @@ def print_attack_surface(results):
 
     # ── Open Ports ─────────────────────────────────────
     # ── Open Ports ─────────────────────────────────────
-    console.print("  [bold bright_green]Open Ports[/]")
+    console.print("[bright_cyan]▶[/] [bold bright_green]Open Ports[/]")
     console.print()
 
     if not ports:
@@ -1058,6 +1085,7 @@ def print_attack_surface(results):
             console.print("  " + "  ·  ".join(std_fmt))
             console.print()
     # ── APIs ──────────────────────────────────────────
+    console.print("[bright_cyan]▶[/] [bold bright_green]Api [/]")
     api_endpoints = [
         e for e in endpoints
         if "/api/" in e.lower()
@@ -1067,14 +1095,14 @@ def print_attack_surface(results):
     ]
 
     if api_endpoints:
-        console.print("  [bold bright_green]API Endpoints[/]")
+        console.print("[bright_cyan]▶[/] [bold bright_green]API Endpoints[/]")
         console.print()
         for e in api_endpoints:
             console.print(f"  [yellow]>[/]  [white]{e}[/]")
         console.print()
        
     # ── Login Pages ────────────────────────────────────
-    console.print("  [bold bright_green]Login Pages[/]")
+    console.print("[bright_cyan]▶[/] [bold bright_green]Login Pages[/]")
     console.print()
     login_pages = [
         s for s in http
@@ -1091,7 +1119,7 @@ def print_attack_surface(results):
     console.print()
     
     # ── Admin Pages ────────────────────────────────────
-    console.print("  [bold bright_green]Admin Pages[/]")
+    console.print("[bright_cyan]▶[/] [bold bright_green]Admin Pages[/]")
     console.print()
     admin_pages = [s for s in http if s.get("is_admin")]
     if admin_pages:
@@ -1129,7 +1157,7 @@ def print_attack_surface(results):
             return "Password endpoint"
         return "Sensitive path"
         
-    console.print("  [bold bright_green]Sensitive Endpoints[/]")
+    console.print("[bright_cyan]▶[/] [bold bright_green]Sensitive Endpoints[/]")
     console.print()
 
     sens_eps = [
@@ -1223,6 +1251,8 @@ def print_attack_surface(results):
             console.print()
 
     # ── JS Findings ────────────────────────────────────
+    console.print("[bright_cyan]▶[/] [bold bright_green]JS findings[/]")
+    console.print()
     secrets = results.get("js_secrets",[])
     if secrets:
         real_secrets = [
@@ -1296,6 +1326,7 @@ def print_attack_surface(results):
         console.print()
 
     # ── Emails ─────────────────────────────────────────
+    console.print("[bright_cyan]▶[/] [bold bright_green]Emails found[/]")
     if emails:
         cat       = results.get("email_harvest",{}).get("categorized",{})
         sec_mails = cat.get("security",[])
