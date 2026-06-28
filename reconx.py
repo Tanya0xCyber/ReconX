@@ -301,7 +301,11 @@ def print_section_rule(title):
         style="bright_green"
     )
     console.print()
-
+    
+def subsection(title):
+    """smaller divider for sub-sections inside Attack Surface"""
+    console.print(f"  [bold green]{title}[/]")
+    console.print()
 # ══════════════════════════════════════════════════════
 #  SECTION 1 — EXECUTIVE SUMMARY
 #  Risk + Top Findings + Recommended Testing Focus
@@ -327,8 +331,12 @@ def print_executive_summary(results, config, elapsed):
         p for p in ports
         if p.get("port") in {2375,6379,27017,9200,6443,2379,23,3389,5900}
     ]
+    admin_svcs = [s for s in http if s.get("is_admin")]
+    bf        = results.get("subdomain_bruteforce",{})
+    live_subs = bf.get("live",[])
+    has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
 
-    # risk — only based on verified findings, never tech detection
+    
     non_header_medium = sum(
         1 for h in hints
         if h.get("severity") == "Medium"
@@ -345,15 +353,21 @@ def print_executive_summary(results, config, elapsed):
         risk, risk_clr = "LOW",    "bright_green"
 
     # ── Risk ──────────────────────────────────────────
+    console.print(f"  [cyan]Risk Level[/]")
+    console.print()
     console.print(
-        f"  [dim]Risk[/]      [{risk_clr}]{risk}[/{risk_clr}]  "
-        f"[dim]·  {sev('Critical')} critical  "
-        f"{sev('High')} high  "
-        f"{sev('Medium')} medium  "
-        f"{sev('Low')} low[/]"
+        f"  [bold {risk_clr}]  {risk}  [/]  "
+        f"[dim]·  "
+        f"[red]{sev('Critical')} critical[/dim]  "
+        f"[yellow]{sev('High')} high[/]  "
+        f"[bright_blue]{sev('Medium')} medium[/]  "
+        f"[dim]{sev('Low')} low[/]"
     )
+    console.print()
     
     # ── Top Findings ──────────────────────────────────
+    console.rule("[dim]Top Findings[/]", style="dim green")
+    console.print()
     if hints:
         ordered = sorted(
             hints,
@@ -361,6 +375,7 @@ def print_executive_summary(results, config, elapsed):
                 "Critical":0,"High":1,"Medium":2,"Low":3,"Info":4
             }.get(h.get("severity","Info"), 5)
         )
+        has_real = any(h.get("severity") != "Info" for h in ordered)
 
         evidence_map = {
             "HDR-001": "Strict-Transport-Security absent in response",
@@ -422,9 +437,18 @@ def print_executive_summary(results, config, elapsed):
             "CVE-001":"Medium","TECH-001":"High","TECH-002":"High",
         }
         console.print()
-        console.print("  [bold bright_green]Top Findings[/]")
-        console.print()
-
+        
+        if has_real:
+            # table for findings
+            t = Table(
+                show_header=False,
+                box=None,
+                padding=(0, 2),
+                show_edge=False,
+            )
+            t.add_column("sev",   width=10)
+            t.add_column("title", style="white")
+       
         for h in ordered[:6]:
             if h.get("severity") == "Info":
                 continue
@@ -435,22 +459,18 @@ def print_executive_summary(results, config, elapsed):
                 "Critical":"red","High":"yellow",
                 "Medium":"bright_blue","Low":"dim"
             }.get(sev_s,"dim")
-
-            console.print(
-                f"  [{sev_clr}][{sev_s}][/{sev_clr}]  "
-                f"[white]{h.get('title','')}[/]"
+            t.add_row(
+                f"[{sev_clr}][{sev_s}][/{sev_clr}]",
+                h.get("title","")
             )
-        console.print()
-
+      
+        console.print(t)
     else:
-        console.print(
-            "  [dim]Top Findings[/]\n"
-            "  [dim]  No confirmed findings from automated scan.[/]"
-        )
+        console.print( "  [dim]  No confirmed findings from automated scan.[/]" )
         console.print()
 
     # ── Recommended Testing Focus ──────────────────────
-    console.print("  [bold bright_green]Recommended Testing Focus[/]")
+    console.rule("[dim]Recommended Testing Focus[/]", style="dim green")
     console.print()
 
     tech      = results.get("tech_stack",[])
@@ -463,15 +483,14 @@ def print_executive_summary(results, config, elapsed):
     live_subs = bf.get("live",[])
     has_no_dmarc = any("DMARC" in h.get("title","") for h in hints)
 
-    high_f   = []
-    medium_f = []
-    low_f    = []
-
     interesting_subs = [
         s for s in live_subs
         if tag_subdomain(s.get("subdomain",""))[2] >= 2  # priority >= 2
         and s.get("status") != 404
     ]
+    high_f   = []
+    medium_f = []
+    low_f    = []
 
 
     # high — only when something concrete found
@@ -504,22 +523,14 @@ def print_executive_summary(results, config, elapsed):
         )
     if any(t in tech for t in ["Laravel","Django","ASP.NET","Spring Boot","PHP"]):
         medium_f.append("Framework misconfiguration — debug mode, config exposure")
-    # In print_executive_summary() and print_next_tests():
-    # Only add subdomain access control if there are non-standard subdomains
-
-   
     if interesting_subs:
         medium_f.append(
-           f"Subdomain access control — "
-           f"{len(interesting_subs)} interesting subdomain(s) found"
+           f"Subdomain access control — {len(interesting_subs)} interesting subdomains found"
         )
     elif len(live_subs) > 3:
-        # only mention if there are enough to be worth checking
         low_f.append(
-           f"Review {len(live_subs)} live subdomains — "
-           f"check for auth differences"
-        )
-        # if <= 3 standard subs — don't mention, not worth cluttering report
+           f"Review {len(live_subs)} live subdomains — ")
+        
 
     # low — worth noting
     missing_hdrs = [s for s in http if s.get("missing_headers")]
@@ -528,30 +539,31 @@ def print_executive_summary(results, config, elapsed):
     if waf:
         low_f.append("WAF bypass testing — header manipulation, encoding")
 
-    if high_f:
-        console.print("  [red]High Priority[/]")
-        for f in high_f[:4]:
-            console.print(f"  [dim]    -  {f}[/]")
-        console.print()
-    if medium_f:
-        console.print("  [yellow]Medium Priority[/]")
-        for f in medium_f[:3]:
-            console.print(f"  [dim]    -  {f}[/]")
-        console.print()
-    if low_f:
-        console.print("  [bright_blue]Low Priority[/]")
-        for f in low_f[:2]:
-            console.print(f"  [dim]    -  {f}[/]")
-        console.print()
-
     if not high_f and not medium_f and not low_f:
         console.print(
             "  [dim]-  No automated shortcuts found[/]\n"
             "  [dim]-  Manual testing: auth flows, IDOR, business logic[/]"
         )
         console.print()
+        return
+        
+    rec_table = Table(
+        show_header=False,
+        box=None,
+        padding=(0, 2),
+        show_edge=False,
+    )
+    rec_table.add_column("priority", width=12)
+    rec_table.add_column("item",     style="dim")
 
-    
+    for f in high_f[:4]:
+        rec_table.add_row("[red]HIGH[/]", f)
+    for f in medium_f[:3]:
+        rec_table.add_row("[yellow]MEDIUM[/]", f)
+    for f in low_f[:2]:
+        rec_table.add_row("[bright_blue]LOW[/]", f)
+
+    console.print(rec_table)
     console.print()
 
 
@@ -578,68 +590,91 @@ def print_target_info(results, config):
         for cdn_val in cdn_server_values
     )
 
-    if server_is_cdn and cdn:
-        display_server = "Unknown (hidden behind CDN)"
-    else:
-        display_server = raw_server
+    display_server = (
+        "Unknown (hidden behind CDN)"
+        if server_is_cdn and cdn
+        else raw_server
+    )
 
-    fields = [
-        ("Domain",  config["target"]),
-        ("IP",      results.get("ip","—")),
-        ("HTTPS",   "Yes" if results.get("https") else "No"),
-        ("Server",  display_server),
-    ]
+    
 
-    for k, v in fields:
-        if v and v != "—":
-            console.print(f"  [dim]{k:<10}[/]  [white]{v}[/]")
+    t = Table(
+        show_header=False,
+        box=None,
+        padding=(0, 2),
+        show_edge=False,
+    )
+    t.add_column("label", style="cyan",  width=12)
+    t.add_column("value", style="white")
 
+    t.add_row("Domain",  config["target"])
+    t.add_row("IP",      results.get("ip","—"))
+    t.add_row("HTTPS",   "Yes" if results.get("https") else "No")
+    t.add_row("Server",  display_server)
+    
     # CDN — shown only if detected
     if cdn:
-        console.print(
-            f"  [dim]{'CDN':<10}[/]  [yellow]{' + '.join(cdn)}[/]  "
-            f"[dim]-> origin IP hidden[/]"
+        t.add_row(
+            "CDN",
+            f"[yellow]{' + '.join(cdn)}[/]  [dim]→ origin IP hidden[/]"
         )
     else:
-        console.print(f"  [dim]{'CDN':<10}[/]  [dim]none detected[/]")
+        t.add_row("CDN", "[dim]none detected[/]")
 
-    # WAF — shown only if confidently detected
     if waf:
-        console.print(
-            f"  [dim]{'WAF':<10}[/]  [red]{' + '.join(waf)}[/]  "
-            f"[dim]-> security filtering active[/]"
+        t.add_row(
+            "WAF",
+            f"[red]{' + '.join(waf)}[/]  [dim]→ security filtering active[/]"
         )
-    # if no WAF — say nothing, absence is the default
 
+    console.print(t)
     console.print()
 
     # WHOIS — domain registration context
     whois = results.get("whois",{})
     if whois and not whois.get("error"):
-        console.print("  [dim]Registration[/]")
-        for k, v in [
-            ("Registrar", whois.get("registrar","")),
-            ("Org",       whois.get("registrant_org","")),
-            ("Created",   whois.get("created","")),
-            ("Expires",   whois.get("expires","")),
-        ]:
-            if v:
-                console.print(f"  [dim]  {k:<10}[/]  [white]{v}[/]")
+        has_any = any([
+            whois.get("registrar"), whois.get("registrant_org"),
+            whois.get("created"),   whois.get("expires"),
+        ])
+        if has_any:
+            console.print("  [cyan]Registration[/]")
+            console.print()
 
-        # expiry warning
-        expires = whois.get("expires","")
-        if expires:
-            try:
-                from datetime import datetime as dt
-                days = (dt.strptime(expires,"%Y-%m-%d") - dt.now()).days
-                if days < 90:
-                    console.print(
-                        f"\n  [red]!  Expires in {days}d[/]  "
-                        f"[dim]-> domain hijack risk[/]"
-                    )
-            except Exception:
-                pass
-        console.print()
+            reg = Table(
+                show_header=False,
+                box=None,
+                padding=(0, 2),
+                show_edge=False,
+            )
+            reg.add_column("label", style="dim",   width=14)
+            reg.add_column("value", style="white")
+
+            for k, v in [
+                ("Registrar", whois.get("registrar","")),
+                ("Org",       whois.get("registrant_org","")),
+                ("Created",   whois.get("created","")),
+                ("Expires",   whois.get("expires","")),
+            ]:
+                if v:
+                    reg.add_row(k, v)
+
+            console.print(reg)
+
+            expires = whois.get("expires","")
+            if expires:
+                try:
+                    from datetime import datetime as dt
+                    days = (dt.strptime(expires,"%Y-%m-%d") - dt.now()).days
+                    if days < 90:
+                        console.print()
+                        console.print(
+                            f"  [red]!  Expires in {days}d[/]  "
+                            f"[dim]→ domain hijack risk[/]"
+                        )
+                except Exception:
+                    pass
+            console.print()
 
     # NS context
     ns = whois.get("name_servers",[]) if whois else []
@@ -651,14 +686,22 @@ def print_target_info(results, config):
         elif "awsdns" in ns_str:
             hint = "[dim]-> AWS Route53 — check for S3 buckets[/]"
         console.print(
-            f"  [dim]{'NS':<10}[/]  "
-            f"[white]{' · '.join(ns[:2])}[/]  {hint}"
+            f"  [cyan]NS[/]  [white]{' · '.join(ns[:2])}[/]{hint}"
         )
         console.print()
 
     # DNS records
     dns = results.get("dns_records",{})
     if dns:
+        dns_t = Table(
+            show_header=False,
+            box=None,
+            padding=(0, 2),
+            show_edge=False,
+        )
+        dns_t.add_column("type",  style="green", width=8)
+        dns_t.add_column("value", style="white")
+
         for rtype in ["A","MX","NS","CNAME"]:
             records = dns.get(rtype,[])
             if not records:
@@ -669,18 +712,19 @@ def print_target_info(results, config):
                     vals.append(f"[{r.get('priority','')}] {r.get('host','')}")
                 else:
                     vals.append(str(r)[:55])
-            console.print(
-                f"  [bright_green]{rtype:<6}[/]  [white]{' · '.join(vals)}[/]"
-            )
+            dns_t.add_row(rtype, " · ".join(vals))
+
+        console.print(dns_t)
 
         mx = dns.get("MX",[])
         if mx:
             mx_str = str(mx).lower()
             if "google" in mx_str:
-                console.print("  [dim]         Google Workspace[/]")
+                console.print("  [dim]  Google Workspace[/]")
             elif "outlook" in mx_str or "microsoft" in mx_str:
-                console.print("  [dim]         Microsoft 365[/]")
+                console.print("  [dim]  Microsoft 365[/]")
         console.print()
+
 
     # email security
     email_sec  = results.get("email_security",{})
@@ -689,52 +733,74 @@ def print_target_info(results, config):
     spf_conf   = spf_data.get("confidence","low")
     dmarc_conf = dmarc_data.get("confidence","low")
 
+    email_t = Table(
+        show_header=False,
+        box=None,
+        padding=(0, 2),
+        show_edge=False,
+    )
+    email_t.add_column("label", style="cyan", width=8)
+    email_t.add_column("value")
+     
     if spf_conf == "high":
-        spf_str = (
-            "[bright_green]present[/]"
+        spf_val = (
+            "[green]present[/]"
             if spf_data.get("present") else
-            "[red]missing[/]  [dim]-> domain spoofable[/]"
+            "[red]missing[/]  [dim]→ domain spoofable[/]"
         )
-        console.print(f"  [dim]{'SPF':<10}[/]   {spf_str}")
+        email_t.add_row("SPF", spf_val)
 
     if dmarc_conf == "high":
-        dmarc_str = (
-            "[bright_green]present[/]"
+        dmarc_val = (
+            "[green]present[/]"
             if dmarc_data.get("present") else
-            "[red]missing[/]  [dim]-> spoofed email passes delivery[/]"
+            "[red]missing[/]  [dim]→ spoofed email passes delivery[/]"
         )
-        console.print(f"  [dim]{'DMARC':<10}[/]   {dmarc_str}")
+        email_t.add_row("DMARC", dmarc_val)
+
+    if spf_conf == "high" or dmarc_conf == "high":
+        console.print(email_t)
+        console.print()
 
     # ISP / ASN
     geo = results.get("geo_asn",{})
     if geo and not geo.get("error"):
-        console.print()
         console.print(
-            f"  [dim]{'ISP':<10}[/]  "
+            f"  [cyan]ISP[/]  "
             f"[white]{geo.get('isp','—')}[/]  "
             f"[dim]{geo.get('asn','—')}[/]"
         )
-
+        console.print() 
     # crt.sh — high value subs from cert logs
     crt  = results.get("crtsh",{})
     subs = crt.get("subdomains",[])
     if subs:
         tagged = [(s, *tag_subdomain(s)) for s in subs]
         hv = [(s,t,c,p) for s,t,c,p in tagged if p >= 2]
-        console.print()
         console.print(
-            f"  [dim]crt.sh[/]  "
-            f"[white]{len(subs)}[/] [dim]subdomains in cert logs  ·  "
+            f"  [cyan]crt.sh[/]  "
+            f"[white]{len(subs)}[/] [dim]in cert logs  ·  "
             f"{len(hv)} high-value[/]"
         )
+        
         if hv:
             console.print()
+            crt_t = Table(
+                show_header=False,
+                box=None,
+                padding=(0, 2),
+                show_edge=False,
+            )
+            crt_t.add_column("sub",  style="white")
+            crt_t.add_column("tag")
+            crt_t.add_column("note", style="dim")
             for name, tag, color, _ in hv[:5]:
-                console.print(
-                    f"  [{color}]>[/{color}]  [white]{name}[/]  "
-                    f"[{color}][{tag}][/{color}]"
-                    f"[dim](cert log — not verified live)[/]"
+               crt_t.add_row(
+                    name,
+                    f"[{color}][{tag}][/{color}]",
+                    "cert log — not verified live"
                 )
+            console.print(crt_t)
         if len(subs) > 5:
             console.print(f"  [dim]  + {len(subs)-5} more in report[/]")
     console.print()
@@ -755,7 +821,6 @@ def print_target_info(results, config):
                 f"[white]{' · '.join(str(p) for p in ports_s[:8])}[/]"
             )
         console.print()
-
 
 # ══════════════════════════════════════════════════════
 #  SECTION 3 — ATTACK SURFACE
