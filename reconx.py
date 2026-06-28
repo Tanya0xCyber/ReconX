@@ -982,24 +982,6 @@ def print_attack_surface(results):
         console.print()
 
     # ── Open Ports ─────────────────────────────────────
-    # ── Open Ports ─────────────────────────────────────
-    console.print("[bright_cyan]▶[/] [bold bright_green]Open Ports[/]")
-    console.print()
-    rows = []
-
-    for p in deduped:
-       rows.append((
-           f"{p['port']}/tcp",
-           port_intel(p["port"])[0],
-           port_intel(p["port"])[2]
-       ))
-
-       print_asset_table(
-          "Open Ports",
-          ["Port","Service","Notes"],
-          rows
-       )
-
     if not ports:
         console.print("  [dim]  no ports scanned[/]")
         console.print()
@@ -1043,73 +1025,22 @@ def print_attack_surface(results):
             if num not in seen_ports:
                 seen_ports.add(num)
                 deduped.append(p)
-
-        crit_lines = []
-        high_lines = []
-        med_lines  = []
-        std_lines  = []
-
+        console.print("[bright_cyan]▶[/] [bold bright_green]Open Ports[/]")
+        console.print()
+        rows = []
         for p in deduped:
-            num  = p.get("port","")
-            host = p.get("host","")
-            info = PORT_INFO.get(num)
-            svc  = info[0] if info else (p.get("service","") or "unknown")
-            risk = info[1] if info else "std"
-            opp  = info[2] if info else ""
+           rows.append((
+              f"{p['port']}/tcp",
+              port_intel(p["port"])[0],
+              port_intel(p["port"])[2]
+           ))
 
-            entry = (num, host, svc, risk, opp)
-            if risk == "crit":
-                crit_lines.append(entry)
-            elif risk == "high":
-                high_lines.append(entry)
-            elif risk == "med":
-                med_lines.append(entry)
-            else:
-                std_lines.append(entry)
+        print_asset_table(
+           "Open Ports",
+           ["Port","Service","Notes"],
+           rows
+        )
 
-        if crit_lines:
-            for num, host, svc, risk, opp in crit_lines:
-                console.print(
-                    f"  [red]{num}/tcp[/]  "
-                    f"[red]open[/]  "
-                    f"[bold white]{svc}[/]  "
-                    f"[dim]{host}[/]"
-                )
-                if opp:
-                    console.print(f"  [dim]           -> {opp}[/]")
-            console.print()
-
-        if high_lines:
-            for num, host, svc, risk, opp in high_lines:
-                console.print(
-                    f"  [yellow]{num}/tcp[/]  "
-                    f"[yellow]open[/]  "
-                    f"[white]{svc}[/]  "
-                    f"[dim]{host}[/]"
-                )
-                if opp:
-                    console.print(f"  [dim]           -> {opp}[/]")
-            console.print()
-
-        if med_lines:
-            for num, host, svc, risk, opp in med_lines:
-                console.print(
-                    f"  [bright_blue]{num}/tcp[/]  "
-                    f"[bright_blue]open[/]  "
-                    f"[white]{svc}[/]  "
-                    f"[dim]{host}[/]"
-                )
-                if opp:
-                    console.print(f"  [dim]           -> {opp}[/]")
-            console.print()
-
-        if std_lines:
-            std_fmt = [
-                f"[dim]{num}/tcp {svc}[/]"
-                for num, host, svc, risk, opp in std_lines
-            ]
-            console.print("  " + "  ·  ".join(std_fmt))
-            console.print()
     # ── APIs ──────────────────────────────────────────
     console.print("[bright_cyan]▶[/] [bold bright_green]Api [/]")
     api_endpoints = [
