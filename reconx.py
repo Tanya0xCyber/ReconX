@@ -1011,14 +1011,6 @@ def print_attack_surface(results):
         s for s in http
         if s.get("is_login") and not s.get("is_admin")
     ]
-    if login_pages:
-        for s in login_pages:
-            console.print(
-                f"  [yellow]>[/]  [white]{s.get('url','')}[/]  "
-                f"[dim]{s.get('status','')}[/]"
-            )
-    else:
-        console.print("  [dim]  none detected[/]")
     print_asset_row(
         "Login Pages",
         [
@@ -1070,9 +1062,6 @@ def print_attack_surface(results):
             return "Password endpoint"
         return "Sensitive path"
         
-    console.print("[bright_cyan]▶[/] [bold bright_green]Sensitive Endpoints[/]")
-    console.print()
-
     sens_eps = [
         e for e in endpoints
         if any(x in e.lower()
@@ -1150,8 +1139,6 @@ def print_attack_surface(results):
             print_asset_row("Missing Headers", hdr_lines)
 
     # ── JS Findings ────────────────────────────────────
-    console.print("[bright_cyan]▶[/] [bold bright_green]JS findings[/]")
-    console.print()
     secrets = results.get("js_secrets",[])
     if secrets:
         real_secrets = [
@@ -1179,9 +1166,7 @@ def print_attack_surface(results):
             + ("  [dim](infra, not secrets)[/]" if internal_ips else ""),
         ]
         print_asset_row("JavaScript Findings", js_lines)
-    else:
-        print_asset_row("JavaScript Findings", [])
-               
+   
         secret_use = {
             "AWS":      "aws cli enumeration",
             "GitHub":   "private repo access",
@@ -1217,7 +1202,9 @@ def print_attack_surface(results):
                     f"[dim]internal network reference[/]"
                 )
         console.print()
-
+    else:
+        print_asset_row("JavaScript Findings", [])
+               
     # ── Emails ─────────────────────────────────────────
    
     if emails:
