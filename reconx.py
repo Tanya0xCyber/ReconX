@@ -835,6 +835,28 @@ def print_target_info(results, config):
 #  Subdomains, Ports, APIs, Login/Admin, Endpoints,
 #  Emails , exposed files 
 # ══════════════════════════════════════════════════════
+def print_asset_row(label, items, empty_text="None detected"):
+    """
+    prints one attack surface row in two-column style:
+    ▶ Label    : item1
+                 item2
+    """
+    prefix = f"[bright_cyan]▶[/] [bold bright_green]{label:<22}[/] [dim]:[/] "
+
+    if not items:
+        console.print(f"{prefix}[dim]{empty_text}[/]")
+        console.print()
+        return
+
+    for i, line in enumerate(items):
+        if i == 0:
+            console.print(f"{prefix}{line}")
+        else:
+            # align with first item — 28 chars for label area
+            console.print(f"{'':28}{line}")
+    console.print()
+
+
 def print_attack_surface(results):
 
     section("Attack Surface")
@@ -849,71 +871,65 @@ def print_attack_surface(results):
    
     # ── Live Subdomains ────────────────────────────────
     console.print(
-       "[bright_cyan]◆[/] [bold bright_green] Live Subdomains [/]",
+       "[bright_cyan]▶[/] [bold bright_green] Live Subdomains [/]",
         end=""
     )
+    # ── Live Subdomains ────────────────────────────────
+    # build display lines from existing logic — NO logic changes
+    sub_lines = []
+
     if takeovers:
-            for t in takeovers:
-                console.print(
-                    f"  [red]TAKEOVER[/]  "
-                    f"[bold white]{t.get('subdomain','')}[/]  "
-                    f"[red]{t.get('service','')}[/]  "
-                    f"[dim]unclaimed external service[/]"
-                )
-            console.print()
+        for t in takeovers:
+            sub_lines.append(
+                f"[red]{t.get('subdomain',''):<35}[/]  "
+                f"[red]TAKEOVER[/]  "
+                f"[dim]{t.get('service','')}[/]"
+            )
+
     if live:
-            tagged = []
-            for s in live:
-                name = s.get("subdomain","")
-                tag, color, pri = tag_subdomain(name)
-                tagged.append((s, tag, color, pri))
+        tagged = []
+        for s in live:
+            name = s.get("subdomain","")
+            tag, color, pri = tag_subdomain(name)
+            tagged.append((s, tag, color, pri))
 
-            critical = [
-                (s,t,c,p) for s,t,c,p in tagged
-                if p == 3 and s.get("status") != 404
-            ]
-            medium = [
-                (s,t,c,p) for s,t,c,p in tagged
-                if p == 2 and s.get("status") != 404
-            ]
-            standard = [
-                (s,t,c,p) for s,t,c,p in tagged
-                if p <= 1 or s.get("status") == 404
-            ]
-            # Print all subdomains in one compact list
-            shown = False
+        critical = [
+            (s,t,c,p) for s,t,c,p in tagged
+            if p == 3 and s.get("status") != 404
+        ]
+        medium = [
+            (s,t,c,p) for s,t,c,p in tagged
+            if p == 2 and s.get("status") != 404
+        ]
+        standard = [
+            (s,t,c,p) for s,t,c,p in tagged
+            if p <= 1 or s.get("status") == 404
+        ]
 
-            for group in (critical, medium, standard):
-               for s, tag, color, _ in group:
+        for group in (critical, medium, standard):
+            for s, tag, color, _ in group:
+                name   = s.get("subdomain","")
+                status = str(s.get("status","—"))
 
-                  if not shown:
-                      console.print("  ", end="")
-                      shown = True
-                  else:
-                      console.print(" " * 18, end="")
+                if status == "200":
+                    st = "[bright_green]200[/]"
+                elif status.startswith("3"):
+                    st = f"[yellow]{status}[/]"
+                elif status in ("401","403"):
+                    st = f"[red]{status}[/]"
+                elif status == "404":
+                    st = "[dim]404[/]"
+                else:
+                    st = f"[white]{status}[/]"
 
-                  name = s.get("subdomain", "")
-                  status = str(s.get("status", "—"))
+                sub_lines.append(
+                    f"[{color}]{name:<35}[/{color}]  "
+                    f"{st:<20}  "
+                    f"[{color}]{tag}[/{color}]"
+                )
 
-                  if status == "200":
-                      st = "[bright_green]200[/]"
-                  elif status.startswith("3"):
-                      st = f"[yellow]{status}[/]"
-                  elif status in ("401", "403"):
-                      st = f"[red]{status}[/]"
-                  elif status == "404":
-                      st = "[dim]404[/]"
-                  else:
-                      st = f"[white]{status}[/]"
-
-                  console.print(f"{name:<35} {st}")
-            if not shown:
-                console.print("  [dim]None detected[/]")
-
-            console.print() 
-        
-        
-          
+    print_asset_row("Live Subdomains", sub_lines)
+              
     # ── Open Ports ─────────────────────────────────────
     if not ports:
         console.print("  [dim]  no ports scanned[/]")
@@ -960,19 +976,29 @@ def print_attack_surface(results):
                 deduped.append(p)
         console.print("[bright_cyan]▶[/] [bold bright_green]Open Ports[/]")
         console.print()
-        rows = []
+        port_lines = []
         for p in deduped:
-           rows.append((
-              f"{p['port']}/tcp",
-              port_intel(p["port"])[0],
-              port_intel(p["port"])[2]
-           ))
+            num  = p.get("port","")
+            info = PORT_INFO.get(num)
+            svc  = info[0] if info else (p.get("service","") or "unknown")
+            risk = info[1] if info else "std"
+            opp  = info[2] if info else ""
 
-        print_asset_table(
-           "Open Ports",
-           ["Port","Service","Notes"],
-           rows
-        )
+            clr = {
+                "crit": "red",
+                "high": "yellow",
+                "med":  "bright_blue",
+                "std":  "dim"
+            }.get(risk, "dim")
+
+            opp_str = f"  [dim]{opp}[/]" if opp else ""
+            port_lines.append(
+                f"[{clr}]{num}/tcp[/{clr}]  "
+                f"[white]{svc:<12}[/]"
+                f"{opp_str}"
+            )
+
+        print_asset_row("Open Ports", port_lines)
 
     # ── APIs ──────────────────────────────────────────
     console.print("[bright_cyan]▶[/] [bold bright_green]Api [/]")
@@ -984,12 +1010,10 @@ def print_attack_surface(results):
         or e.lower().startswith("/v3")
     ]
 
-    if api_endpoints:
-        console.print("[bright_cyan]▶[/] [bold bright_green]API Endpoints[/]")
-        console.print()
-        for e in api_endpoints:
-            console.print(f"  [yellow]>[/]  [white]{e}[/]")
-        console.print()
+    print_asset_row(
+        "API Endpoints",
+        [f"[yellow]{e}[/]" for e in api_endpoints]
+    )
        
     # ── Login Pages ────────────────────────────────────
     console.print("[bright_cyan]▶[/] [bold bright_green]Login Pages[/]")
