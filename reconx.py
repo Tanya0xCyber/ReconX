@@ -849,12 +849,8 @@ def print_attack_surface(results):
    
     # ── Live Subdomains ────────────────────────────────
     console.print(
-       "[bright_cyan]◆[/] [bold bright_green] Live Subdomains [/]"
-    )
-    
-   
+       "[bright_cyan]◆[/] [bold bright_green] Live Subdomains [/]", end="")
         
-
         if takeovers:
             for t in takeovers:
                 console.print(
@@ -883,64 +879,38 @@ def print_attack_surface(results):
                 (s,t,c,p) for s,t,c,p in tagged
                 if p <= 1 or s.get("status") == 404
             ]
+            # Print all subdomains in one compact list
+            shown = False
 
-            console.print(
-                f"  [dim]Total[/]  "
-                f"[white]{len(live)}[/]  [dim]·[/]  "
-                f"[red]{len(critical)} critical[/]  [dim]·[/]  "
-                f"[yellow]{len(medium)} medium[/]  [dim]·[/]  "
-                f"[dim]{len(standard)} standard[/]"
-            )
-            console.print()
+            for group in (critical, medium, standard):
+               for s, tag, color, _ in group:
 
-            # show ALL critical
-            for s, tag, color, _ in critical:
-                name   = s.get("subdomain","")
-                status = s.get("status","—")
-                title  = (s.get("title") or "")[:35]
-                st = (
-                    f"[bright_green]{status}[/]" if status == 200
-                    else f"[yellow]{status}[/]" if str(status).startswith("3")
-                    else f"[red]{status}[/]"    if status in [401,403]
-                    else f"[dim]{status}[/]"
-                )
-                console.print(
-                    f"  [red]>[/]  [white]{name}[/]  "
-                    f"{st}  [{color}][{tag}][/{color}]"
-                    + (f"  [dim]{title}[/]" if title else "")
-                )
+               if not shown:
+                  console.print("  ", end="")
+                  shown = True
+               else:
+                  console.print(" " * 18, end="")
 
-            # show ALL medium — separate loop, NOT nested in critical
-            for s, tag, color, _ in medium:
-                name   = s.get("subdomain","")
-                status = s.get("status","—")
-                title  = (s.get("title") or "")[:35]
-                st = (
-                    f"[bright_green]{status}[/]" if status == 200
-                    else f"[yellow]{status}[/]" if str(status).startswith("3")
-                    else f"[red]{status}[/]"    if status in [401,403]
-                    else f"[dim]{status}[/]"
-                )
-                console.print(
-                    f"  [yellow]·[/]  [white]{name}[/]  "
-                    f"{st}  [{color}][{tag}][/{color}]"
-                    + (f"  [dim]{title}[/]" if title else "")
-                )
+               name = s.get("subdomain", "")
+               status = str(s.get("status", "—"))
 
-            # show standard compact
-            if standard:
-                console.print()
-                console.print(f"  [dim]Standard ({len(standard)}):[/]")
-                for s, tag, color, _ in standard:
-                    name   = s.get("subdomain","")
-                    status = s.get("status","—")
-                    if status == 404:
-                        console.print(f"  [dim]  · {name}  404  (resolves, no content)[/]")
-                    else:
-                        console.print(f"  [dim]  · {name}  {status}[/]")
+               if status == "200":
+                  st = "[bright_green]200[/]"
+               elif status.startswith("3"):
+                  st = f"[yellow]{status}[/]"
+               elif status in ("401", "403"):
+                  st = f"[red]{status}[/]"
+               elif status == "404":
+                  st = "[dim]404[/]"
+               else:
+                  st = f"[white]{status}[/]"
 
-        console.print()
+              console.print(f"{name:<35} {st}")
+        if not shown:
+           console.print("  [dim]None detected[/]")
 
+        console.print() 
+          
     # ── Open Ports ─────────────────────────────────────
     if not ports:
         console.print("  [dim]  no ports scanned[/]")
