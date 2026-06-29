@@ -852,8 +852,7 @@ def print_attack_surface(results):
        "[bright_cyan]◆[/] [bold bright_green] Live Subdomains [/]",
         end=""
     )
-        
-        if takeovers:
+    if takeovers:
             for t in takeovers:
                 console.print(
                     f"  [red]TAKEOVER[/]  "
@@ -862,7 +861,7 @@ def print_attack_surface(results):
                     f"[dim]unclaimed external service[/]"
                 )
             console.print()
-        if live:
+    if live:
             tagged = []
             for s in live:
                 name = s.get("subdomain","")
@@ -908,10 +907,12 @@ def print_attack_surface(results):
                       st = f"[white]{status}[/]"
 
                   console.print(f"{name:<35} {st}")
-        if not shown:
+      if not shown:
            console.print("  [dim]None detected[/]")
 
-        console.print() 
+      console.print() 
+        
+        
           
     # ── Open Ports ─────────────────────────────────────
     if not ports:
