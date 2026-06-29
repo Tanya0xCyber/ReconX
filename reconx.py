@@ -849,7 +849,9 @@ def print_attack_surface(results):
    
     # ── Live Subdomains ────────────────────────────────
     console.print(
-       "[bright_cyan]◆[/] [bold bright_green] Live Subdomains [/]", end="")
+       "[bright_cyan]◆[/] [bold bright_green] Live Subdomains [/]",
+        end=""
+    )
         
         if takeovers:
             for t in takeovers:
@@ -885,27 +887,27 @@ def print_attack_surface(results):
             for group in (critical, medium, standard):
                for s, tag, color, _ in group:
 
-               if not shown:
-                  console.print("  ", end="")
-                  shown = True
-               else:
-                  console.print(" " * 18, end="")
+                  if not shown:
+                      console.print("  ", end="")
+                      shown = True
+                  else:
+                      console.print(" " * 18, end="")
 
-               name = s.get("subdomain", "")
-               status = str(s.get("status", "—"))
+                  name = s.get("subdomain", "")
+                  status = str(s.get("status", "—"))
 
-               if status == "200":
-                  st = "[bright_green]200[/]"
-               elif status.startswith("3"):
-                  st = f"[yellow]{status}[/]"
-               elif status in ("401", "403"):
-                  st = f"[red]{status}[/]"
-               elif status == "404":
-                  st = "[dim]404[/]"
-               else:
-                  st = f"[white]{status}[/]"
+                  if status == "200":
+                      st = "[bright_green]200[/]"
+                  elif status.startswith("3"):
+                      st = f"[yellow]{status}[/]"
+                  elif status in ("401", "403"):
+                      st = f"[red]{status}[/]"
+                  elif status == "404":
+                      st = "[dim]404[/]"
+                  else:
+                      st = f"[white]{status}[/]"
 
-              console.print(f"{name:<35} {st}")
+                  console.print(f"{name:<35} {st}")
         if not shown:
            console.print("  [dim]None detected[/]")
 
