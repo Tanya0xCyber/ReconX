@@ -1007,8 +1007,6 @@ def print_attack_surface(results):
     )
        
     # ── Login Pages ────────────────────────────────────
-    console.print("[bright_cyan]▶[/] [bold bright_green]Login Pages[/]")
-    console.print()
     login_pages = [
         s for s in http
         if s.get("is_login") and not s.get("is_admin")
@@ -1021,11 +1019,15 @@ def print_attack_surface(results):
             )
     else:
         console.print("  [dim]  none detected[/]")
-    console.print()
+    print_asset_row(
+        "Login Pages",
+        [
+            f"[yellow]{s.get('url',''):<40}[/]  [dim]{s.get('status','')}[/]"
+            for s in login_pages
+        ]
+    )
     
     # ── Admin Pages ────────────────────────────────────
-    console.print("[bright_cyan]▶[/] [bold bright_green]Admin Pages[/]")
-    console.print()
     admin_pages = [s for s in http if s.get("is_admin")]
     if admin_pages:
         for s in admin_pages:
@@ -1035,7 +1037,13 @@ def print_attack_surface(results):
             )
     else:
         console.print("  [dim]  none detected[/]")
-    console.print()
+    print_asset_row(
+        "Admin Pages",
+        [
+            f"[red]{s.get('url',''):<40}[/]  [dim]{s.get('status','')}[/]"
+            for s in admin_pages
+        ]
+    )
 
     # ── Sensitive Endpoints ────────────────────────────
     def endpoint_label(path):
@@ -1093,36 +1101,26 @@ def print_attack_surface(results):
         and "/api/" not in e.lower()
         and not e.lower().startswith("/v")
     ]
+    all_sens = (
+        [f"[red]{e:<40}[/]  [dim]{endpoint_label(e)}[/]" for e in sens_eps]
+        + [f"[yellow]{e:<40}[/]  [dim]{endpoint_label(e)}[/]" for e in auth_eps]
+    )
+    print_asset_row("Sensitive Endpoints", all_sens)
 
-    if sens_eps:
-        console.print("  [dim]Sensitive:[/]")
-        for e in sens_eps:
-            console.print(
-                f"  [red]>[/]  [white]{e}[/]  "
-                f"[dim]{endpoint_label(e)}[/]"
-            )
-        console.print()
+    # exposed files
+    exposed_files = [
+        e for e in endpoints
+        if any(e.lower().endswith(ext) for ext in [
+            ".txt",".xml",".log",".bak",
+            ".sql",".env",".config",".yaml",".yml"
+        ])
+    ]
+    print_asset_row(
+        "Exposed Files",
+        [f"[red]{f}[/]" for f in exposed_files[:6]]
+    )
 
-    if auth_eps:
-        console.print("  [dim]Auth-related:[/]")
-        for e in auth_eps:
-            console.print(
-                f"  [yellow]>[/]  [white]{e}[/]  "
-                f"[dim]{endpoint_label(e)}[/]"
-            )
-        console.print()
-
-    if api_eps:
-        console.print("  [dim]API paths:[/]")
-        for e in api_eps:
-            console.print(f"  [dim]·  {e}[/]")
-        console.print()
-
-    if other_eps:
-        console.print("  [dim]Other endpoints:[/]")
-        for e in other_eps:
-            console.print(f"  [dim]·  {e}[/]")
-        console.print()
+    
 
     # ── Missing Security Headers (attack surface context) ──
     if http:
@@ -1145,15 +1143,11 @@ def print_attack_surface(results):
                 "X-Content-Type-Options":
                     "XCTO missing — MIME sniffing possible",
             }
-            console.print("  [bold bright_green]Missing Security Headers[/]")
-            console.print()
-            for hdr, count in common:
-                explain = header_explain.get(hdr, f"{hdr} missing")
-                console.print(
-                    f"  [bright_blue]·[/]  [white]{explain}[/]  "
-                    f"[dim]({count} service(s))[/]"
-                )
-            console.print()
+            hdr_lines = [
+                f"[yellow]{header_explain.get(hdr, hdr)}[/]  [dim]({count}x)[/]"
+                for hdr, count in common
+            ]
+            print_asset_row("Missing Headers", hdr_lines)
 
     # ── JS Findings ────────────────────────────────────
     console.print("[bright_cyan]▶[/] [bold bright_green]JS findings[/]")
@@ -1173,27 +1167,21 @@ def print_attack_surface(results):
             s for s in secrets
             if s.get("type","") in ["Generic API Key","Generic Secret"]
         ]
+        js_lines = [
+            f"[dim]Credentials / Keys[/]   "
+            f"[{'red' if real_secrets else 'dim'}]{len(real_secrets)}[/]",
 
-        console.print("  [bold bright_green]JS Analysis[/]")
-        console.print()
-        console.print(
-            f"  [dim]  Credentials / Keys[/]  "
-            + (f"[red]{len(real_secrets)}[/]"
-               if real_secrets else f"[dim]0[/]")
-        )
-        console.print(
-            f"  [dim]  Generic references[/]  "
-            + (f"[yellow]{len(generic)}[/]"
-               if generic else f"[dim]0[/]")
-        )
-        console.print(
-            f"  [dim]  Internal IPs      [/]  "
+            f"[dim]Generic references[/]   "
+            f"[{'yellow' if generic else 'dim'}]{len(generic)}[/]",
+
+            f"[dim]Internal IPs[/]         "
             f"[bright_blue]{len(internal_ips)}[/]"
-            + ("  [dim](infra references, not secrets)[/]"
-               if internal_ips else "")
-        )
-        console.print()
-
+            + ("  [dim](infra, not secrets)[/]" if internal_ips else ""),
+        ]
+        print_asset_row("JavaScript Findings", js_lines)
+    else:
+        print_asset_row("JavaScript Findings", [])
+               
         secret_use = {
             "AWS":      "aws cli enumeration",
             "GitHub":   "private repo access",
@@ -1231,20 +1219,17 @@ def print_attack_surface(results):
         console.print()
 
     # ── Emails ─────────────────────────────────────────
-    console.print("[bright_cyan]▶[/] [bold bright_green]Emails found[/]")
+   
     if emails:
         cat       = results.get("email_harvest",{}).get("categorized",{})
         sec_mails = cat.get("security",[])
-        console.print(
-            f"  [bold bright_green]Emails Found[/]  "
-            f"[white]{len(emails)}[/]"
-            + (f"  [dim]·  {len(sec_mails)} security contact(s)[/]"
-               if sec_mails else "")
+        display   = sec_mails if sec_mails else emails
+        print_asset_row(
+            "Emails",
+            [f"[white]{e}[/]" for e in display[:6]]
         )
-        console.print()
-        for e in (sec_mails or emails)[:4]:
-            console.print(f"  [dim]·  {e}[/]")
-        console.print()
+    else:
+        print_asset_row("Emails", [])
 
 
 # ══════════════════════════════════════════════════════
