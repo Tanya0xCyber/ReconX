@@ -1721,8 +1721,7 @@ def main():
             f"[bold white]IP[/]       : [bright_green]{validation.get('ip','?')}[/]\n"
             f"[bold white]HTTPS[/]    : "
             f"{'[bright_green]Yes[/]' if validation.get('https') else '[red]No[/]'}\n"
-            f"[bold white]Server[/]   : [bright_green]{srv_display}[/]\n"
-            f"[bold white]Duration[/] : [bright_green]{round(elapsed,1)}s[/]",
+            f"[bold white]Server[/]   : [bright_green]{srv_display}[/]",
             title="[bold bright_green] Recon [/]",
             border_style="green",
             padding=(0,1),
@@ -1773,19 +1772,22 @@ def main():
         print_next_tests(results, config)
 
     # single footer line
-    console.print("[green]" + "="*90 + "[/]")
-    console.print(
-        f"[bold bright_green]Scan Finished[/]  "
-        f"[white]{config['target']}[/]"
-    )
-
-    if report_path:
-        console.print(
-            f"[dim]Report:[/] [white]{report_path}[/]"
-        )
-
-    console.print("[green]" + "="*90 + "[/]")
+    console.print("[green]" + "=" * 90 + "[/]")
     console.print()
+    console.print(
+       f"[bold bright_green]Scan Completed[/] "
+       f"[dim]•[/] "
+       f"[white]{round(elapsed,1)} s[/]"
+    )
+    if report_path:
+       console.print(
+           f"[cyan]Report[/] [dim]:[/] "
+           f"[white]{report_path}[/]"
+       )
+    console.print()
+    console.print("[green]" + "=" * 90 + "[/]")
+    console.print()
+    
 
 if __name__ == "__main__":
     main()
