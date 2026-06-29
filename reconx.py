@@ -907,10 +907,10 @@ def print_attack_surface(results):
                       st = f"[white]{status}[/]"
 
                   console.print(f"{name:<35} {st}")
-      if not shown:
-           console.print("  [dim]None detected[/]")
+            if not shown:
+                console.print("  [dim]None detected[/]")
 
-      console.print() 
+            console.print() 
         
         
           
