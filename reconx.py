@@ -57,19 +57,16 @@ def print_banner():
     console.print("  [bold white]Automated Reconnaissance Framework[/]")
     console.print()
 
+    console.print("[cyan]Author [/][dim]:[/] [white]Tanya Singh[/]")
+    console.print("[cyan]Version[/][dim]:[/] [white]v1.0[/]")
     console.print(
-       "  [dim]recon pipeline[/]  "
-       "[green]•[/]  "
-       "[dim]attack surface[/]  "
-       "[green]•[/]  "
-       "[dim]pentest[/]"
+       "[cyan]Modules[/][dim]:[/] "
+       "[white]Recon[/] [green]•[/] "
+       "[white]Attack Surface[/] [green]•[/] "
+       "[white]Pentest[/]"
     )
 
-    console.print("  [dim]Author :[/] Tanya Singh" 
-        "[green]|[/]  "
-        "[dim]Version:[/] v1.0")
-
-    console.print("[green]" + "="*90 + "[/]")
+    console.print("[green]" + "="*60 + "[/]")
     console.print()
 
 
@@ -354,21 +351,19 @@ def print_executive_summary(results, config, elapsed):
 
     # ── Risk ──────────────────────────────────────────
     console.print(
-       "[bright_cyan]◆[/] [bold bright_green] Risk Assessment[/]"
+        "[bright_cyan]◆[/] "
+        "[bold bright_green]Risk Assessment[/] "
+        "[dim]:[/]   "
+        f"[red]Critical[/] [white]{sev('Critical')}[/]   "
+        "[dim]•[/] "
+        f"[yellow]High[/] [white]{sev('High')}[/]   "
+        "[dim]•[/] "
+        f"[bright_blue]Medium[/] [white]{sev('Medium')}[/]   "
+        "[dim]•[/] "
+        f"[bright_green]Low[/] [white]{sev('Low')}[/]"
     )
+
     console.print()
-    console.print(
-       f"[cyan]  Critical[/] : [white]{sev('Critical')}[/]"
-    )
-    console.print(
-       f"[cyan]  High[/]     : [white]{sev('High')}[/]"
-    )
-    console.print(
-       f"[cyan]  Medium[/]   : [white]{sev('Medium')}[/]"
-    )
-    console.print(
-       f"[cyan]  Low[/]      : [white]{sev('Low')}[/]"
-    ) 
     
     # ── Top Findings ──────────────────────────────────
     console.print(
@@ -1722,17 +1717,17 @@ def main():
     )
     console.print(
         Panel.fit(
-           f"[bold white]Target[/]   : {config['target']}\n"
-           f"[bold white]IP[/]       : {validation.get('ip','?')}\n"
-           f"[bold white]HTTPS[/]    : "
-           f"{'[bright_green]Yes[/]' if validation.get('https') else '[red]No[/]'}\n"
-           f"[bold white]Server[/]   : {srv_display}",
-           border_style="green",
-           padding=(0,2),
-           title="[bold green]Recon[/]"
+            f"[bold white]Target[/]   : [bright_green]{config['target']}[/]\n"
+            f"[bold white]IP[/]       : [bright_green]{validation.get('ip','?')}[/]\n"
+            f"[bold white]HTTPS[/]    : "
+            f"{'[bright_green]Yes[/]' if validation.get('https') else '[red]No[/]'}\n"
+            f"[bold white]Server[/]   : [bright_green]{srv_display}[/]\n"
+            f"[bold white]Duration[/] : [bright_green]{round(elapsed,1)}s[/]",
+            title="[bold bright_green] Recon [/]",
+            border_style="green",
+            padding=(0,1),
         )
     )
-
     # ── run all stages silently ────────────────────────
     try:
         run_stage("Passive Recon", run_passive_recon,
@@ -1755,11 +1750,7 @@ def main():
         console.print("\n  [yellow]!  interrupted[/]\n")
 
     elapsed = time.time() - total_start
-    console.print(
-        f"[bold bright_green]Recon Completed[/]  "
-        f"[dim]in[/] "
-        f"[white]{round(elapsed,1)}s[/]"
-    )
+    
 
     console.rule(style="green")
 
