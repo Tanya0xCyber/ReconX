@@ -1021,14 +1021,6 @@ def print_attack_surface(results):
     
     # ── Admin Pages ────────────────────────────────────
     admin_pages = [s for s in http if s.get("is_admin")]
-    if admin_pages:
-        for s in admin_pages:
-            console.print(
-                f"  [red]>[/]  [white]{s.get('url','')}[/]  "
-                f"[dim]{s.get('status','')}[/]"
-            )
-    else:
-        console.print("  [dim]  none detected[/]")
     print_asset_row(
         "Admin Pages",
         [
