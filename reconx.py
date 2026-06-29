@@ -56,19 +56,9 @@ def print_banner():
     # info line under art
     console.print("  [bold white]Automated Reconnaissance Framework[/]")
     console.print()
-
-    console.print("[cyan]Author [/][dim]:[/] [white]Tanya Singh[/]")
-    console.print("[cyan]Version[/][dim]:[/] [white]v1.0[/]")
-    console.print(
-       "[cyan]Modules[/][dim]:[/] "
-       "[white]Recon[/] [green]•[/] "
-       "[white]Attack Surface[/] [green]•[/] "
-       "[white]Pentest[/]"
-    )
-
-    console.print("[green]" + "="*60 + "[/]")
+    console.print("[dim]Tanya Singh[/] [green]•[/] [dim]v1.0[/]")
+    console.print("[green]" + "="*40 + "[/]")
     console.print()
-
 
 # ══════════════════════════════════════════════════════
 #  ARG PARSER
@@ -1772,8 +1762,7 @@ def main():
         print_next_tests(results, config)
 
     # single footer line
-    console.print("[green]" + "=" * 90 + "[/]")
-    console.print()
+    console.print("[green]" + "=" * 50 + "[/]")
     console.print(
        f"[bold bright_green]Scan Completed[/] "
        f"[dim]•[/] "
@@ -1784,8 +1773,7 @@ def main():
            f"[cyan]Report[/] [dim]:[/] "
            f"[white]{report_path}[/]"
        )
-    console.print()
-    console.print("[green]" + "=" * 90 + "[/]")
+    console.print("[green]" + "=" * 50 + "[/]")
     console.print()
     
 
