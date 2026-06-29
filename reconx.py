@@ -870,12 +870,6 @@ def print_attack_surface(results):
     emails    = results.get("emails",[])
    
     # ── Live Subdomains ────────────────────────────────
-    console.print(
-       "[bright_cyan]▶[/] [bold bright_green] Live Subdomains [/]",
-        end=""
-    )
-    # ── Live Subdomains ────────────────────────────────
-    # build display lines from existing logic — NO logic changes
     sub_lines = []
 
     if takeovers:
@@ -974,8 +968,6 @@ def print_attack_surface(results):
             if num not in seen_ports:
                 seen_ports.add(num)
                 deduped.append(p)
-        console.print("[bright_cyan]▶[/] [bold bright_green]Open Ports[/]")
-        console.print()
         port_lines = []
         for p in deduped:
             num  = p.get("port","")
@@ -1001,7 +993,6 @@ def print_attack_surface(results):
         print_asset_row("Open Ports", port_lines)
 
     # ── APIs ──────────────────────────────────────────
-    console.print("[bright_cyan]▶[/] [bold bright_green]Api [/]")
     api_endpoints = [
         e for e in endpoints
         if "/api/" in e.lower()
